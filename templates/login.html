@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}Login | Monk Play{% endblock %}
+
+{% block content %}
+<main class="auth-layout">
+    <section class="auth-card">
+        <div>
+            <p class="eyebrow">Secure access</p>
+            <h1>Login with your Gmail account</h1>
+            <p class="hero-text">
+                Connect a Google account so listeners can sign in with a familiar flow.
+                This page is wired for Flask and ready for your Google OAuth keys.
+            </p>
+        </div>
+
+        {% if current_user %}
+        <div class="account-summary">
+            {% if current_user.picture %}
+            <img class="account-avatar" src="{{ current_user.picture }}" alt="{{ current_user.name }}">
+            {% else %}
+            <div class="account-avatar fallback">{{ current_user.name[0] if current_user.name else "U" }}</div>
+            {% endif %}
+            <div>
+                <strong>{{ current_user.name }}</strong>
+                <p>{{ current_user.email }}</p>
+            </div>
+        </div>
+        <a class="primary-btn" href="{{ url_for('logout') }}">Logout</a>
+        {% else %}
+        <a class="google-btn" href="{{ url_for('login_google') }}">
+            <span>G</span>
+            <span>Continue with Google</span>
+        </a>
+        <p class="helper-note">
+            {% if google_login_enabled %}
+            Google OAuth is configured. Click the button above to sign in.
+            {% else %}
+            Add <code>GOOGLE_CLIENT_ID</code>, <code>GOOGLE_CLIENT_SECRET</code>, and <code>SECRET_KEY</code> in your environment to activate Gmail login.
+            {% endif %}
+        </p>
+        {% endif %}
+    </section>
+
+    <section class="setup-card">
+        <p class="eyebrow">How to enable Gmail login</p>
+        <ol class="setup-list">
+            <li>Create OAuth credentials in Google Cloud Console.</li>
+            <li>Set the redirect URI to <code>http://127.0.0.1:5000/auth/google</code>.</li>
+            <li>Export your client ID and secret before running Flask.</li>
+            <li>Start the app and test the login button.</li>
+        </ol>
+    </section>
+</main>
+{% endblock %}

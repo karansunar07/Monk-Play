@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}Register | Monk Play{% endblock %}
+
+{% block content %}
+<main class="auth-layout">
+    <section class="auth-showcase">
+        <p class="eyebrow">Join the platform</p>
+        <h1>Create your account and build your own listening universe.</h1>
+        <p class="lead">
+            Save mixes, follow artists, and create a streaming-style experience powered by Flask.
+        </p>
+        <div class="showcase-panel">
+            <strong>Included for new listeners</strong>
+            <p>Daily Mixes, Indie Radar, and private library access</p>
+        </div>
+    </section>
+
+    <section class="auth-card">
+        <h1>Register</h1>
+        <p class="lead">Create your account to get started.</p>
+
+        <a class="google-login-btn" href="{{ url_for('google_login') }}">
+            <span class="google-mark">G</span>
+            <span>Sign up with Google</span>
+        </a>
+
+        <div class="divider">
+            <span>or create an account with email</span>
+        </div>
+
+        <form class="auth-form" method="post">
+            <label for="name">Name</label>
+            <input id="name" name="name" type="text" placeholder="Enter your name" required>
+
+            <label for="email">Email</label>
+            <input id="email" name="email" type="email" placeholder="Enter your email" required>
+
+            <label for="password">Password</label>
+            <input id="password" name="password" type="password" placeholder="Create a password" required>
+
+            <button class="primary-btn full-width" type="submit">Register</button>
+        </form>
+
+        {% if not google_login_enabled %}
+        <p class="config-hint">Google signup will work after you add your Google OAuth keys in `config.py`.</p>
+        {% endif %}
+
+        <p class="auth-switch">Already have an account? <a href="{{ url_for('login') }}">Login</a></p>
+    </section>
+</main>
+{% endblock %}

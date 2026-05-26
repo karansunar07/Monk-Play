@@ -1,0 +1,323 @@
+{% extends "base.html" %}
+
+{% block title %}Monk Play Home{% endblock %}
+
+{% block content %}
+<main class="spotify-shell">
+    <aside class="sidebar">
+        <div class="sidebar-card">
+            <p class="eyebrow">Discover</p>
+            <h3>Your Library</h3>
+            <p>Jump into albums, playlists, artists, and daily mixes built for every mood.</p>
+        </div>
+
+        <nav class="side-links">
+            <a href="#hero">Featured</a>
+            <a href="#playlists">Playlists</a>
+            <a href="#tracks">Trending</a>
+            <a href="#artists">Artists</a>
+        </nav>
+
+        <div class="sidebar-card compact">
+            <p class="eyebrow">Account</p>
+            {% if session.get("user_id") %}
+            <h3>{{ user_name }}</h3>
+            <p>You are signed in and ready to save your music flow.</p>
+            {% else %}
+            <h3>Join Monk Play</h3>
+            <p>Create your account to unlock playlists, favorites, and private listening rooms.</p>
+            {% endif %}
+        </div>
+    </aside>
+
+    <section class="main-panel">
+        <section class="hero" id="hero">
+            <div class="hero-copy">
+                <p class="eyebrow">Spotify-style Flask clone</p>
+                <h1>Stream the mood. Shape the moment.</h1>
+                <p class="lead">
+                    A bold music homepage with immersive playlists, trending tracks, artist highlights,
+                    and authentication screens powered by your Flask backend.
+                </p>
+                <div class="hero-actions">
+                    {% if session.get("user_id") %}
+                    <a class="primary-btn" href="#playlists">Open playlists</a>
+                    <a class="ghost-btn" href="#tracks">See trending</a>
+                    {% else %}
+                    <a class="primary-btn" href="{{ url_for('register') }}">Create account</a>
+                    <a class="ghost-btn" href="{{ url_for('login') }}">Login</a>
+                    {% endif %}
+                </div>
+                <div class="stat-row">
+                    <div>
+                        <strong>24M+</strong>
+                        <span>active listeners</span>
+                    </div>
+                    <div>
+                        <strong>350+</strong>
+                        <span>editorial mixes</span>
+                    </div>
+                    <div>
+                        <strong>8K</strong>
+                        <span>emerging artists</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="hero-art">
+                <div class="glass-card">
+                    <p>Featured album</p>
+                    <h2>Afterlight City</h2>
+                    <span>Nova Echo</span>
+                </div>
+                <div class="mini-badge top">Late Night Sessions</div>
+                <div class="mini-badge bottom">Fresh for your queue</div>
+            </div>
+        </section>
+
+        <section class="content-section" id="playlists">
+            <div class="section-head">
+                <div>
+                    <p class="eyebrow">Editorial picks</p>
+                    <h2>Made for your day</h2>
+                </div>
+            </div>
+
+            <div class="playlist-grid">
+                <article class="playlist-card">
+                    <div class="cover cover-one"></div>
+                    <div class="card-body">
+                        <h3>Midnight Drive</h3>
+                        <p>Neon synths and cinematic beats for city lights and open roads.</p>
+                    </div>
+                </article>
+                <article class="playlist-card">
+                    <div class="cover cover-two"></div>
+                    <div class="card-body">
+                        <h3>Lo-Fi Focus</h3>
+                        <p>Warm textures and calm rhythms to keep your concentration flowing.</p>
+                    </div>
+                </article>
+                <article class="playlist-card">
+                    <div class="cover cover-three"></div>
+                    <div class="card-body">
+                        <h3>Festival Rush</h3>
+                        <p>Main-stage energy, sharp drops, and high-tempo anthems all night.</p>
+                    </div>
+                </article>
+                <article class="playlist-card">
+                    <div class="cover cover-four"></div>
+                    <div class="card-body">
+                        <h3>Indie Sunrise</h3>
+                        <p>Bright guitars, soft vocals, and a clean fresh start to the morning.</p>
+                    </div>
+                </article>
+            </div>
+        </section>
+
+        <section class="content-section" id="tracks">
+            <div class="section-head">
+                <div>
+                    <p class="eyebrow">Trending now</p>
+                    <h2>Tracks everybody is playing</h2>
+                </div>
+            </div>
+
+            <div class="track-table">
+                <div class="track-row">
+                    <div class="track-main">
+                        <span class="track-number">1</span>
+                        <div>
+                            <h3>Electric Bloom</h3>
+                            <p>Nova Echo</p>
+                        </div>
+                    </div>
+                    <span class="track-tag">Chillwave</span>
+                    <span class="track-time">3:24</span>
+                </div>
+                <div class="track-row">
+                    <div class="track-main">
+                        <span class="track-number">2</span>
+                        <div>
+                            <h3>Golden Static</h3>
+                            <p>Velvet Parade</p>
+                        </div>
+                    </div>
+                    <span class="track-tag">Alt Pop</span>
+                    <span class="track-time">4:02</span>
+                </div>
+                <div class="track-row">
+                    <div class="track-main">
+                        <span class="track-number">3</span>
+                        <div>
+                            <h3>Night Pulse</h3>
+                            <p>Afterglow Club</p>
+                        </div>
+                    </div>
+                    <span class="track-tag">Dance</span>
+                    <span class="track-time">2:58</span>
+                </div>
+                <div class="track-row">
+                    <div class="track-main">
+                        <span class="track-number">4</span>
+                        <div>
+                            <h3>Quiet Satellites</h3>
+                            <p>North Avenue</p>
+                        </div>
+                    </div>
+                    <span class="track-tag">Indie</span>
+                    <span class="track-time">3:46</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="content-section" id="artists">
+            <div class="section-head">
+                <div>
+                    <p class="eyebrow">Artists to watch</p>
+                    <h2>Fresh voices in rotation</h2>
+                </div>
+            </div>
+
+            <div class="artist-grid">
+                <article class="artist-card">
+                    <div class="artist-avatar">L</div>
+                    <h3>Luna Vale</h3>
+                    <p>Electro Soul</p>
+                </article>
+                <article class="artist-card">
+                    <div class="artist-avatar">A</div>
+                    <h3>Atlas June</h3>
+                    <p>Indie Pop</p>
+                </article>
+                <article class="artist-card">
+                    <div class="artist-avatar">S</div>
+                    <h3>Signal Youth</h3>
+                    <p>Synth Rock</p>
+                </article>
+            </div>
+        </section>
+
+        <section class="content-section" id="imports">
+            <div class="section-head">
+                <div>
+                    <p class="eyebrow">Spotify import</p>
+                    <h2>Bring in playlists from your Spotify account</h2>
+                </div>
+                <a class="ghost-btn" href="{{ url_for('spotify_import') }}">Open importer</a>
+            </div>
+
+            {% if imported_playlists %}
+            <div class="playlist-grid">
+                {% for playlist in imported_playlists %}
+                <article class="playlist-card imported-card">
+                    {% if playlist.image_url %}
+                    <img class="imported-image" src="{{ playlist.image_url }}" alt="{{ playlist.name }}">
+                    {% else %}
+                    <div class="cover cover-one"></div>
+                    {% endif %}
+                    <div class="card-body">
+                        <h3>{{ playlist.name }}</h3>
+                        <p>{{ playlist.owner_name }} | {{ playlist.track_count }} tracks</p>
+                        {% if playlist.spotify_url %}
+                        <a class="ghost-btn inline-btn" href="{{ playlist.spotify_url }}" target="_blank" rel="noreferrer">Open on Spotify</a>
+                        {% endif %}
+                    </div>
+                </article>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-import-state">
+                <p>No Spotify playlists imported yet.</p>
+                <a class="primary-btn" href="{{ url_for('spotify_import') }}">Import your first playlist</a>
+            </div>
+            {% endif %}
+        </section>
+
+        {% if is_admin %}
+        <section class="content-section" id="admin-tools">
+            <div class="section-head">
+                <div>
+                    <p class="eyebrow">Admin tools</p>
+                    <h2>Add a song manually</h2>
+                </div>
+            </div>
+
+            <div class="auth-card">
+                <p class="lead">Admins can add songs by hand to any playlist imported into this account.</p>
+
+                <form class="auth-form" method="post" action="{{ url_for('add_manual_track_route') }}">
+                    <label for="imported_playlist_id">Imported playlist</label>
+                    <select id="imported_playlist_id" name="imported_playlist_id" class="auth-select" required>
+                        <option value="">Select a playlist</option>
+                        {% for playlist in imported_playlists %}
+                        <option value="{{ playlist.id }}">{{ playlist.name }} by {{ playlist.owner_name or 'Unknown owner' }}</option>
+                        {% endfor %}
+                    </select>
+
+                    <label for="track_name">Song name</label>
+                    <input id="track_name" name="track_name" type="text" placeholder="Enter song name" required>
+
+                    <label for="artist_names">Artist name</label>
+                    <input id="artist_names" name="artist_names" type="text" placeholder="Enter artist name" required>
+
+                    <label for="album_name">Album name</label>
+                    <input id="album_name" name="album_name" type="text" placeholder="Enter album name">
+
+                    <label for="spotify_url">Spotify link</label>
+                    <input id="spotify_url" name="spotify_url" type="url" placeholder="https://open.spotify.com/track/...">
+
+                    <div class="duration-grid">
+                        <div>
+                            <label for="duration_minutes">Minutes</label>
+                            <input id="duration_minutes" name="duration_minutes" type="number" min="0" value="0">
+                        </div>
+                        <div>
+                            <label for="duration_seconds">Seconds</label>
+                            <input id="duration_seconds" name="duration_seconds" type="number" min="0" max="59" value="0">
+                        </div>
+                    </div>
+
+                    <button class="primary-btn full-width" type="submit">Add song manually</button>
+                </form>
+            </div>
+        </section>
+        {% endif %}
+    </section>
+</main>
+
+<footer class="player-bar">
+    <div class="player-track">
+        <div class="player-cover"></div>
+        <div>
+            <strong id="player-title">Midnight Drive</strong>
+            <span id="player-subtitle">Curated playlist</span>
+        </div>
+    </div>
+    <div class="player-controls">
+        <button type="button">Prev</button>
+        <button type="button" class="play-main" id="toggle-play">Play</button>
+        <button type="button">Next</button>
+    </div>
+    <div class="player-progress">
+        <span>1:12</span>
+        <div class="progress-bar"><span></span></div>
+        <span>3:45</span>
+    </div>
+    <div class="player-volume">
+        <button type="button" id="volume-down" aria-label="Decrease volume">Vol -</button>
+        <input
+            id="volume-slider"
+            class="volume-slider"
+            type="range"
+            min="0"
+            max="100"
+            step="5"
+            value="70"
+            aria-label="Volume"
+        >
+        <button type="button" id="volume-up" aria-label="Increase volume">Vol +</button>
+        <span id="volume-value">70%</span>
+    </div>
+</footer>
+{% endblock %}

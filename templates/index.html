@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+
+{% block title %}Monk Play Home{% endblock %}
+
+{% block content %}
+<div class="page-shell">
+    <aside class="sidebar">
+        <div class="brand">
+            <span class="brand-mark"></span>
+            <div>
+                <p>Monk Play</p>
+                <span>Music for every mood</span>
+            </div>
+        </div>
+
+        <nav class="side-nav">
+            <a class="active" href="#hero">Discover</a>
+            <a href="#playlists">Playlists</a>
+            <a href="#tracks">Trending</a>
+            <a href="#artists">Artists</a>
+            <a href="{{ url_for('playlist_helper') }}">Copy Songs</a>
+        </nav>
+
+        <div class="sidebar-card">
+            <p class="eyebrow">Now trending</p>
+            <h3>Neon Frequencies</h3>
+            <p>A cinematic mix of synth-pop, indie dance, and late-night energy.</p>
+            <button type="button">Play Mix</button>
+        </div>
+    </aside>
+
+    <main class="content">
+        <section class="hero" id="hero">
+            <div class="hero-copy">
+                <p class="eyebrow">Spotify-inspired Flask project</p>
+                <h1>Bring your music world online with a bold listening experience.</h1>
+                <p class="hero-text">
+                    This demo now includes a Gmail login flow, curated playlists, trending songs,
+                    and a playlist helper that makes Spotify song copying much cleaner.
+                </p>
+                <div class="hero-actions">
+                    <a class="primary-btn" href="#playlists">Open playlists</a>
+                    <a class="ghost-btn" href="{{ url_for('playlist_helper') }}">Copy playlist songs</a>
+                </div>
+                <div class="hero-stats">
+                    <div>
+                        <strong>18M+</strong>
+                        <span>monthly listeners</span>
+                    </div>
+                    <div>
+                        <strong>250+</strong>
+                        <span>editorial playlists</span>
+                    </div>
+                    <div>
+                        <strong>4K</strong>
+                        <span>indie artists featured</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="hero-visual">
+                <div class="visual-card">
+                    <p>Featured release</p>
+                    <h2>Echoes of Tomorrow</h2>
+                    <span>Nova Echo | 2026</span>
+                </div>
+                <div class="floating-panel top">
+                    <span>Live Sessions</span>
+                    <strong>12 new performances</strong>
+                </div>
+                <div class="floating-panel bottom">
+                    <span>Personalized for you</span>
+                    <strong>Made for late-night focus</strong>
+                </div>
+            </div>
+        </section>
+
+        <section class="section" id="playlists">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Editorial picks</p>
+                    <h2>Featured playlists</h2>
+                </div>
+                <a href="#tracks">See all tracks</a>
+            </div>
+
+            <div class="playlist-grid">
+                {% for playlist in featured_playlists %}
+                <article class="playlist-card">
+                    <img src="{{ playlist.cover }}" alt="{{ playlist.title }}">
+                    <div class="playlist-body">
+                        <h3>{{ playlist.title }}</h3>
+                        <p>{{ playlist.description }}</p>
+                        <button class="play-btn" type="button" data-playlist="{{ playlist.title }}">Play</button>
+                    </div>
+                </article>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="section" id="tracks">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Hot right now</p>
+                    <h2>Trending tracks</h2>
+                </div>
+            </div>
+
+            <div class="track-list">
+                {% for track in trending_tracks %}
+                <div class="track-row">
+                    <div class="track-main">
+                        <span class="track-number">{{ loop.index }}</span>
+                        <div>
+                            <h3>{{ track.title }}</h3>
+                            <p>{{ track.artist }}</p>
+                        </div>
+                    </div>
+                    <span class="track-tag">{{ track.mood }}</span>
+                    <span class="track-length">{{ track.length }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="section artists-section" id="artists">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Fresh voices</p>
+                    <h2>Artists to watch</h2>
+                </div>
+            </div>
+
+            <div class="artist-grid">
+                {% for artist in artists %}
+                <article class="artist-card">
+                    <div class="artist-avatar">{{ artist.name[0] }}</div>
+                    <h3>{{ artist.name }}</h3>
+                    <p>{{ artist.genre }}</p>
+                </article>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="section promo-strip">
+            <div class="promo-card">
+                <div>
+                    <p class="eyebrow">New feature</p>
+                    <h2>Login with Gmail and clean up copied Spotify songs in seconds.</h2>
+                </div>
+                <div class="promo-actions">
+                    <a class="primary-btn" href="{{ url_for('login') }}">Open login</a>
+                    <a class="ghost-btn" href="{{ url_for('playlist_helper') }}">Use helper</a>
+                </div>
+            </div>
+        </section>
+    </main>
+</div>
+
+<div class="player-bar">
+    <div class="player-track">
+        <div class="mini-cover"></div>
+        <div>
+            <strong id="player-title">Neon Frequencies</strong>
+            <span id="player-subtitle">Curated Playlist</span>
+        </div>
+    </div>
+
+    <div class="player-controls">
+        <button type="button" aria-label="Previous track">Prev</button>
+        <button type="button" class="control-main" id="toggle-play" aria-label="Play or pause">Play</button>
+        <button type="button" aria-label="Next track">Next</button>
+    </div>
+
+    <div class="player-progress">
+        <span>1:12</span>
+        <div class="progress-line">
+            <span></span>
+        </div>
+        <span>3:45</span>
+    </div>
+</div>
+{% endblock %}

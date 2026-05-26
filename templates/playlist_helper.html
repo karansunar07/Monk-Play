@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block title %}Playlist Helper | Monk Play{% endblock %}
+
+{% block content %}
+<main class="helper-layout">
+    <section class="helper-hero">
+        <div>
+            <p class="eyebrow">Spotify workflow</p>
+            <h1>Copy playlist songs the easy way</h1>
+            <p class="hero-text">
+                Paste a Spotify playlist link and the copied song text from Spotify.
+                Monk Play will clean the lines and give you a one-click copy block.
+            </p>
+        </div>
+        <div class="helper-steps">
+            {% for step in playlist_steps %}
+            <div class="step-chip">{{ loop.index }}. {{ step }}</div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="helper-grid">
+        <form class="helper-form" method="post">
+            <label for="playlist_url">Spotify playlist URL</label>
+            <input
+                id="playlist_url"
+                name="playlist_url"
+                type="text"
+                placeholder="https://open.spotify.com/playlist/..."
+                value="{{ playlist_url }}"
+            >
+
+            <label for="copied_text">Copied songs from Spotify</label>
+            <textarea
+                id="copied_text"
+                name="copied_text"
+                rows="12"
+                placeholder="Paste song lines here, one per line"
+            >{{ copied_text }}</textarea>
+
+            <div class="form-actions">
+                <button class="primary-btn" type="submit">Clean my songs</button>
+                <button class="ghost-btn" type="button" data-copy-target="sample-songs">Copy sample format</button>
+            </div>
+        </form>
+
+        <div class="helper-result-card">
+            <div class="result-head">
+                <div>
+                    <p class="eyebrow">Result</p>
+                    <h2>Ready-to-copy list</h2>
+                </div>
+                {% if imported_tracks %}
+                <button class="primary-btn" type="button" data-copy-target="clean-output">Copy all songs</button>
+                {% endif %}
+            </div>
+
+            {% if playlist_id %}
+            <div class="info-box">
+                <strong>Playlist detected</strong>
+                <p>Spotify playlist ID: <code>{{ playlist_id }}</code></p>
+            </div>
+            {% endif %}
+
+            {% if imported_tracks %}
+            <textarea id="clean-output" class="clean-output" rows="12" readonly>{% for track in imported_tracks %}{{ track }}{% if not loop.last %}
+{% endif %}{% endfor %}</textarea>
+            <div class="track-chip-list">
+                {% for track in imported_tracks %}
+                <button class="track-copy-chip" type="button" data-copy-text="{{ track }}">{{ track }}</button>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <p>Paste your copied Spotify songs to generate a clean copy block.</p>
+                <textarea id="sample-songs" class="clean-output" rows="6" readonly>{% for track in sample_imported_tracks %}{{ track }}{% if not loop.last %}
+{% endif %}{% endfor %}</textarea>
+            </div>
+        </div>
+    </section>
+</main>
+{% endblock %}

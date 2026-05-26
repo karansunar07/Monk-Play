@@ -1,0 +1,5 @@
+Authlib
+Flask
+PyMySQL
+requests
+Werkzeug
