@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard | Monk Play{% endblock %}
+
+{% block content %}
+<main class="dashboard-layout">
+    <section class="dashboard-hero">
+        <div>
+            <p class="eyebrow">{{ user_role|title }} dashboard</p>
+            <h1>Welcome back, {{ user_name }}.</h1>
+            <p class="lead">
+                Track your playlists, monitor your library, and keep your Monk Play account organized.
+            </p>
+        </div>
+
+        <div class="showcase-panel">
+            <strong>Spotify status</strong>
+            <p>
+                {% if dashboard_data.spotify_connected %}
+                Spotify is connected and ready for imports.
+                {% else %}
+                Spotify is not connected yet. Link your account to import playlists.
+                {% endif %}
+            </p>
+        </div>
+    </section>
+
+    <section class="dashboard-grid">
+        <article class="dashboard-card">
+            <p class="eyebrow">Library</p>
+            <h2>{{ dashboard_data.playlist_count }}</h2>
+            <p>Imported playlists in your account.</p>
+        </article>
+
+        <article class="dashboard-card">
+            <p class="eyebrow">Tracks</p>
+            <h2>{{ dashboard_data.track_count }}</h2>
+            <p>Total saved tracks across your imported playlists.</p>
+        </article>
+
+        <article class="dashboard-card">
+            <p class="eyebrow">Connection</p>
+            <h2>{% if dashboard_data.spotify_connected %}Live{% else %}Offline{% endif %}</h2>
+            <p>{% if dashboard_data.spotify_connected %}Ready to pull Spotify data.{% else %}Reconnect Spotify to keep syncing.{% endif %}</p>
+        </article>
+
+        {% if user_role == "admin" %}
+        <article class="dashboard-card accent-card">
+            <p class="eyebrow">Admin</p>
+            <h2>{{ dashboard_data.user_count }}</h2>
+            <p>Total registered accounts, including {{ dashboard_data.admin_count }} admin users.</p>
+        </article>
+        {% endif %}
+    </section>
+
+    <section class="content-section">
+        <div class="section-head">
+            <div>
+                <p class="eyebrow">Recent playlists</p>
+                <h2>Your latest imports</h2>
+            </div>
+            <div class="hero-actions">
+                <a class="ghost-btn" href="{{ url_for('home') }}">Back home</a>
+                <a class="primary-btn" href="{{ url_for('spotify_import') }}">Import more</a>
+            </div>
+        </div>
+
+        {% if dashboard_data.recent_playlists %}
+        <div class="dashboard-list">
+            {% for playlist in dashboard_data.recent_playlists %}
+            <article class="dashboard-list-item">
+                <div>
+                    <h3>{{ playlist.name }}</h3>
+                    <p>{{ playlist.owner_name or "Unknown owner" }}</p>
+                </div>
+                <span class="track-tag">{{ playlist.track_count }} tracks</span>
+                {% if playlist.spotify_url %}
+                <a class="ghost-btn inline-btn" href="{{ playlist.spotify_url }}" target="_blank" rel="noreferrer">Open on Spotify</a>
+                {% endif %}
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-import-state">
+            <p>No imported playlists yet. Bring one in from Spotify to populate your dashboard.</p>
+            <a class="primary-btn" href="{{ url_for('spotify_import') }}">Import a playlist</a>
+        </div>
+        {% endif %}
+    </section>
+
+    {% if user_role == "admin" %}
+    <section class="content-section">
+        <div class="section-head">
+            <div>
+                <p class="eyebrow">Admin dashboard</p>
+                <h2>Manage users and roles</h2>
+            </div>
+        </div>
+
+        <div class="admin-table">
+            <div class="admin-row admin-row-head">
+                <span>Name</span>
+                <span>Email</span>
+                <span>Role</span>
+                <span>Playlists</span>
+                <span>Action</span>
+            </div>
+            {% for managed_user in admin_users %}
+            <form class="admin-row" method="post" action="{{ url_for('update_user_role', user_id=managed_user.id) }}">
+                <span>{{ managed_user.name }}</span>
+                <span>{{ managed_user.email }}</span>
+                <select name="role" class="auth-select">
+                    <option value="user" {% if managed_user.role == "user" %}selected{% endif %}>User</option>
+                    <option value="admin" {% if managed_user.role == "admin" %}selected{% endif %}>Admin</option>
+                </select>
+                <span>{{ managed_user.playlist_count }}</span>
+                <button class="ghost-btn" type="submit">Update</button>
+            </form>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="content-section">
+        <div class="section-head">
+            <div>
+                <p class="eyebrow">Console</p>
+                <h2>Active logs and errors</h2>
+            </div>
+            <a class="ghost-btn" href="{{ url_for('dashboard') }}">Refresh logs</a>
+        </div>
+
+        <div class="console-panel">
+            {% if app_logs %}
+                {% for log in app_logs %}
+                <article class="console-line {{ log.level }}">
+                    <div class="console-meta">
+                        <span>{{ log.time }}</span>
+                        <strong>{{ log.level|upper }}</strong>
+                        <span>{{ log.method }} {{ log.path }}</span>
+                    </div>
+                    <p>{{ log.message }}</p>
+                    {% if log.details %}
+                    <code>{{ log.details }}</code>
+                    {% endif %}
+                </article>
+                {% endfor %}
+            {% else %}
+            <div class="console-empty">No logs captured yet.</div>
+            {% endif %}
+        </div>
+    </section>
+
+    <section class="content-section">
+        <div class="section-head">
+            <div>
+                <p class="eyebrow">Admin shortcuts</p>
+                <h2>Library actions</h2>
+            </div>
+        </div>
+
+        <div class="dashboard-grid">
+            <article class="dashboard-card">
+                <h3>Manual song entry</h3>
+                <p>Add a track by hand to any imported playlist from the home page admin tools.</p>
+                <a class="primary-btn inline-btn" href="{{ url_for('home') }}#admin-tools">Open admin tools</a>
+            </article>
+
+            <article class="dashboard-card">
+                <h3>Playlist imports</h3>
+                <p>Review imported playlists, reconnect Spotify, and keep the local library current.</p>
+                <a class="ghost-btn inline-btn" href="{{ url_for('spotify_import') }}">Open importer</a>
+            </article>
+        </div>
+    </section>
+    {% endif %}
+</main>
+{% endblock %}
