@@ -1,10 +1,12 @@
 import os
 import secrets
+from collections import deque
+from datetime import datetime
 from urllib.parse import urlencode
 
 import requests
-from authlib.integrations.flask_client import OAuth
-from flask import Flask, flash, redirect, render_template, request, session, url_for
+from flask import Flask, flash, has_request_context, redirect, render_template, request, session, url_for
+from werkzeug.exceptions import HTTPException
 from werkzeug.security import check_password_hash, generate_password_hash
 
 import config
@@ -18,28 +20,56 @@ STATIC_DIR = os.path.join(BASE_DIR, "app", "statics")
 app = Flask(__name__, template_folder=TEMPLATE_DIR, static_folder=STATIC_DIR)
 app.config["SECRET_KEY"] = config.SECRET_KEY
 
-oauth = OAuth(app)
-google = None
-
-SPOTIFY_SCOPES = "playlist-read-private playlist-read-collaborative"
-
-if config.GOOGLE_CLIENT_ID and config.GOOGLE_CLIENT_SECRET:
-    google = oauth.register(
-        name="google",
-        client_id=config.GOOGLE_CLIENT_ID,
-        client_secret=config.GOOGLE_CLIENT_SECRET,
-        server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
-        client_kwargs={"scope": "openid email profile"},
-    )
+SPOTIFY_SCOPES = "playlist-read-private playlist-read-collaborative user-read-private"
+APP_LOGS = deque(maxlen=120)
 
 
 @app.context_processor
 def inject_provider_state():
     return {
-        "google_login_enabled": google is not None,
         "spotify_connected": bool(session.get("spotify_access_token")),
         "is_admin": session.get("user_role") == "admin",
     }
+
+
+def write_app_log(level, message, details=""):
+    path = request.path if has_request_context() else ""
+    method = request.method if has_request_context() else ""
+    APP_LOGS.appendleft(
+        {
+            "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "level": level,
+            "message": message,
+            "details": details,
+            "path": path,
+            "method": method,
+        }
+    )
+
+
+@app.before_request
+def log_request_start():
+    if request.endpoint != "static":
+        write_app_log("info", "Request started")
+
+
+@app.after_request
+def log_request_finish(response):
+    if request.endpoint != "static":
+        level = "error" if response.status_code >= 500 else "warning" if response.status_code >= 400 else "info"
+        write_app_log(level, f"Request finished with {response.status_code}")
+    return response
+
+
+@app.errorhandler(Exception)
+def log_unhandled_error(error):
+    if isinstance(error, HTTPException):
+        write_app_log("warning", f"HTTP error {error.code}", error.description)
+        return error
+
+    write_app_log("error", "Unhandled application error", str(error))
+    flash("Something went wrong. Check the admin logs for details.", "danger")
+    return redirect(url_for("dashboard" if session.get("user_id") else "login"))
 
 
 def login_user_session(user):
@@ -76,6 +106,92 @@ def get_imported_playlists(user_id):
     cursor.close()
     conn.close()
     return playlists
+
+
+def is_admin_user():
+    return session.get("user_role") == "admin"
+
+
+def get_admin_users():
+    conn = get_connection()
+    if conn is None:
+        return []
+
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT users.id, users.name, users.email, users.role,
+            COUNT(imported_playlists.id) AS playlist_count
+        FROM users
+        LEFT JOIN imported_playlists ON imported_playlists.user_id = users.id
+        GROUP BY users.id, users.name, users.email, users.role
+        ORDER BY users.id DESC
+        """
+    )
+    users = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    return users
+
+
+def get_dashboard_data(user_id, user_role):
+    dashboard = {
+        "playlist_count": 0,
+        "track_count": 0,
+        "recent_playlists": [],
+        "user_count": 0,
+        "admin_count": 0,
+        "spotify_connected": bool(session.get("spotify_access_token")),
+    }
+
+    if not user_id:
+        return dashboard
+
+    conn = get_connection()
+    if conn is None:
+        return dashboard
+
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT COUNT(*) AS playlist_count, COALESCE(SUM(track_count), 0) AS track_count
+        FROM imported_playlists
+        WHERE user_id = %s
+        """,
+        (user_id,),
+    )
+    personal_totals = cursor.fetchone() or {}
+    dashboard["playlist_count"] = personal_totals.get("playlist_count", 0)
+    dashboard["track_count"] = personal_totals.get("track_count", 0)
+
+    cursor.execute(
+        """
+        SELECT name, owner_name, track_count, spotify_url
+        FROM imported_playlists
+        WHERE user_id = %s
+        ORDER BY id DESC
+        LIMIT 4
+        """,
+        (user_id,),
+    )
+    dashboard["recent_playlists"] = cursor.fetchall()
+
+    if user_role == "admin":
+        cursor.execute(
+            """
+            SELECT
+                COUNT(*) AS user_count,
+                SUM(CASE WHEN role = 'admin' THEN 1 ELSE 0 END) AS admin_count
+            FROM users
+            """
+        )
+        admin_totals = cursor.fetchone() or {}
+        dashboard["user_count"] = admin_totals.get("user_count", 0)
+        dashboard["admin_count"] = admin_totals.get("admin_count", 0)
+
+    cursor.close()
+    conn.close()
+    return dashboard
 
 
 def add_manual_track(imported_playlist_id, user_id, track_data, is_admin=False):
@@ -211,12 +327,25 @@ def get_spotify_playlists():
         return []
 
     payload = response.json()
-    return payload.get("items", [])
+    playlists = payload.get("items", [])
+
+    profile_response = spotify_get_with_refresh("me")
+    current_user_id = ""
+    if profile_response is not None and profile_response.status_code == 200:
+        current_user_id = profile_response.json().get("id", "")
+
+    for playlist in playlists:
+        owner_id = (playlist.get("owner") or {}).get("id", "")
+        playlist["can_import_tracks"] = bool(
+            current_user_id and (owner_id == current_user_id or playlist.get("collaborative"))
+        )
+
+    return playlists
 
 
 def fetch_playlist_tracks(playlist_id, token):
     tracks = []
-    next_url = f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks?limit=100"
+    next_url = f"https://api.spotify.com/v1/playlists/{playlist_id}/items?limit=50"
 
     while next_url:
         response = requests.get(
@@ -245,7 +374,11 @@ def fetch_playlist_tracks(playlist_id, token):
 
             error_message = (error_payload.get("error") or {}).get("message")
             if response.status_code == 403:
-                return None, "Spotify denied access to those playlist tracks for the connected account."
+                return None, (
+                    "Spotify only allows this app to import tracks from playlists you own "
+                    "or playlists where you are a collaborator. Create your own copy of "
+                    "that playlist in Spotify, reconnect Spotify, then import the copy."
+                )
             if response.status_code == 404:
                 return None, "Spotify could not find that playlist or its tracks."
             if error_message:
@@ -371,6 +504,73 @@ def home():
     )
 
 
+@app.route("/dashboard")
+def dashboard():
+    if not session.get("user_id"):
+        flash("Login first to open your dashboard.", "danger")
+        return redirect(url_for("login"))
+
+    dashboard_data = get_dashboard_data(session.get("user_id"), session.get("user_role"))
+    return render_template(
+        "dashboard.html",
+        user_name=session.get("user_name"),
+        user_role=session.get("user_role", "user"),
+        dashboard_data=dashboard_data,
+        admin_users=get_admin_users() if is_admin_user() else [],
+        app_logs=list(APP_LOGS) if is_admin_user() else [],
+    )
+
+
+@app.route("/admin/users/<int:user_id>/role", methods=["POST"])
+def update_user_role(user_id):
+    if not session.get("user_id"):
+        flash("Login first to manage users.", "danger")
+        return redirect(url_for("login"))
+
+    if not is_admin_user():
+        flash("Only admins can change user roles.", "danger")
+        return redirect(url_for("dashboard"))
+
+    new_role = request.form.get("role", "").strip().lower()
+    if new_role not in {"admin", "user"}:
+        flash("Choose a valid role.", "danger")
+        return redirect(url_for("dashboard"))
+
+    conn = get_connection()
+    if conn is None:
+        flash("Database is not available right now.", "danger")
+        return redirect(url_for("dashboard"))
+
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, role FROM users WHERE id = %s", (user_id,))
+    user = cursor.fetchone()
+    if not user:
+        cursor.close()
+        conn.close()
+        flash("That user could not be found.", "danger")
+        return redirect(url_for("dashboard"))
+
+    if user_id == session.get("user_id") and user.get("role") == "admin" and new_role == "user":
+        cursor.execute("SELECT COUNT(*) AS admin_count FROM users WHERE role = 'admin'")
+        admin_count = (cursor.fetchone() or {}).get("admin_count", 0)
+        if admin_count <= 1:
+            cursor.close()
+            conn.close()
+            flash("You cannot remove the last admin account.", "danger")
+            return redirect(url_for("dashboard"))
+
+    cursor.execute("UPDATE users SET role = %s WHERE id = %s", (new_role, user_id))
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    if user_id == session.get("user_id"):
+        session["user_role"] = new_role
+
+    flash("User role updated.", "success")
+    return redirect(url_for("dashboard"))
+
+
 @app.route("/admin/manual-track", methods=["POST"])
 def add_manual_track_route():
     if not session.get("user_id"):
@@ -456,80 +656,6 @@ def login():
         return redirect(url_for("login"))
 
     return render_template("login.html")
-
-
-@app.route("/login/google")
-def google_login():
-    if google is None:
-        flash("Google login is not configured yet. Add your Google client keys in config.py.", "danger")
-        return redirect(url_for("login"))
-
-    redirect_uri = url_for("google_authorize", _external=True)
-    return google.authorize_redirect(redirect_uri)
-
-
-@app.route("/auth/google")
-def google_authorize():
-    if google is None:
-        flash("Google login is not configured yet.", "danger")
-        return redirect(url_for("login"))
-
-    token = google.authorize_access_token()
-    user_info = token.get("userinfo")
-
-    if not user_info:
-        user_info = google.get("userinfo").json()
-
-    email = (user_info.get("email") or "").strip().lower()
-    name = (user_info.get("name") or email.split("@")[0] or "Google User").strip()
-    google_id = user_info.get("sub", "")
-    picture = user_info.get("picture", "")
-
-    if not email:
-        flash("Google did not return an email address for this account.", "danger")
-        return redirect(url_for("login"))
-
-    conn = get_connection()
-    if conn is None:
-        flash("Database is not available right now.", "danger")
-        return redirect(url_for("login"))
-
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM users WHERE email = %s", (email,))
-    user = cursor.fetchone()
-
-    if user:
-        cursor.execute(
-            """
-            UPDATE users
-            SET google_id = %s, avatar_url = %s, name = %s
-            WHERE id = %s
-            """,
-            (google_id, picture, name, user["id"]),
-        )
-        conn.commit()
-        cursor.execute("SELECT * FROM users WHERE id = %s", (user["id"],))
-        user = cursor.fetchone()
-    else:
-        role = get_role_for_new_user(cursor)
-        random_password_hash = generate_password_hash(secrets.token_urlsafe(24))
-        cursor.execute(
-            """
-            INSERT INTO users (name, email, password, role, google_id, avatar_url)
-            VALUES (%s, %s, %s, %s, %s, %s)
-            """,
-            (name, email, random_password_hash, role, google_id, picture),
-        )
-        conn.commit()
-        cursor.execute("SELECT * FROM users WHERE email = %s", (email,))
-        user = cursor.fetchone()
-
-    cursor.close()
-    conn.close()
-
-    login_user_session(user)
-    flash("Logged in with Google successfully!", "success")
-    return redirect(url_for("home"))
 
 
 @app.route("/spotify/connect")
@@ -729,6 +855,8 @@ def logout():
 
 
 create_tables()
+
+
 
 
 
