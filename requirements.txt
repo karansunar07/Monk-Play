@@ -1,4 +1,3 @@
-Authlib
 Flask
 PyMySQL
 requests

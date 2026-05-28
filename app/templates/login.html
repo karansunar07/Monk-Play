@@ -6,28 +6,19 @@
 <main class="auth-layout">
     <section class="auth-showcase">
         <p class="eyebrow">Welcome back</p>
-        <h1>Login and step back into your sound.</h1>
+        <h1>Login and get back to your library.</h1>
         <p class="lead">
-            Pick up where you left off with saved playlists, liked songs, and personalized music rooms.
+            Manage imported playlists, review saved tracks, and keep your local collection tidy.
         </p>
         <div class="showcase-panel">
-            <strong>Tonight's recommendation</strong>
-            <p>After Hours Coding Mix</p>
+            <strong>Workspace ready</strong>
+            <p>Imports, admin edits, and account tools stay in one place.</p>
         </div>
     </section>
 
     <section class="auth-card">
         <h1>Login</h1>
         <p class="lead">Enter your account details to continue.</p>
-
-        <a class="google-login-btn" href="{{ url_for('google_login') }}">
-            <span class="google-mark">G</span>
-            <span>Continue with Google</span>
-        </a>
-
-        <div class="divider">
-            <span>or login with email</span>
-        </div>
 
         <form class="auth-form" method="post">
             <label for="email">Email</label>
@@ -38,10 +29,6 @@
 
             <button class="primary-btn full-width" type="submit">Login</button>
         </form>
-
-        {% if not google_login_enabled %}
-        <p class="config-hint">Add `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in `config.py` to activate Google login.</p>
-        {% endif %}
 
         <p class="auth-switch">New here? <a href="{{ url_for('register') }}">Create an account</a></p>
     </section>

@@ -1,29 +1,29 @@
 {% extends "base.html" %}
 
-{% block title %}Spotify Import | Monk Play{% endblock %}
+{% block title %}Playlist Import | Monk Play{% endblock %}
 
 {% block content %}
 <main class="import-layout">
     <section class="import-hero">
         <div>
-            <p class="eyebrow">Spotify playlist import</p>
-            <h1>Add playlists from Spotify into your Flask app.</h1>
+            <p class="eyebrow">Playlist import</p>
+            <h1>Add supported playlists into your Flask app.</h1>
             <p class="lead">
-                Connect your Spotify account, choose one of the playlists your account can access,
-                and import its tracks into your local Monk Play database.
+                Connect your account, choose a playlist Spotify allows this app to read,
+                and save its tracks into your local Monk Play database.
             </p>
         </div>
 
         <div class="showcase-panel">
-            <strong>What this imports</strong>
+            <strong>Saved locally</strong>
             <p>Playlist name, owner, cover art, track list, artist names, album names, and Spotify links.</p>
         </div>
     </section>
 
     <section class="import-grid">
         <div class="auth-card">
-            <h2>1. Connect Spotify</h2>
-            <p class="lead">Authorize the app with your Spotify account so we can read your playlists.</p>
+            <h2>1. Connect account</h2>
+            <p class="lead">Authorize the app so it can list playlists and import the ones Spotify permits.</p>
 
             {% if spotify_connected %}
             <div class="connection-badge connected">Spotify is connected</div>
@@ -38,7 +38,7 @@
         </div>
 
         <div class="auth-card">
-            <h2>2. Import a playlist</h2>
+            <h2>2. Choose a playlist</h2>
             <p class="lead">Choose a playlist from the connected account and save it into your app.</p>
 
             <form class="auth-form" method="post">
@@ -46,8 +46,10 @@
                 <select id="playlist_id" name="playlist_id" class="auth-select" {% if not spotify_connected %}disabled{% endif %}>
                     <option value="">Select a playlist</option>
                     {% for playlist in spotify_playlists %}
-                    <option value="{{ playlist.id }}">
-                        {{ playlist.get('name', 'Untitled Playlist') }} ({{ playlist.get('tracks', {}).get('total', 0) }} tracks)
+                    <option value="{{ playlist.get('id') }}" {% if not playlist.get('can_import_tracks') %}disabled{% endif %}>
+                        {{ playlist.get('name', 'Untitled Playlist') }}
+                        ({{ playlist.get('tracks', {}).get('total', 0) }} tracks)
+                        {% if not playlist.get('can_import_tracks') %}- make a copy to import{% endif %}
                     </option>
                     {% endfor %}
                 </select>

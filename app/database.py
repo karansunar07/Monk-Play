@@ -85,12 +85,16 @@ def create_tables():
             artist_names VARCHAR(255) NULL,
             album_name VARCHAR(255) NULL,
             spotify_url VARCHAR(500) NULL,
+            local_file_url VARCHAR(500) NULL,
+            source_type VARCHAR(30) NOT NULL DEFAULT 'spotify',
             duration_ms INT NOT NULL DEFAULT 0,
             track_position INT NOT NULL,
             FOREIGN KEY (imported_playlist_id) REFERENCES imported_playlists(id) ON DELETE CASCADE
         )
         """
     )
+    ensure_column(cursor, "imported_playlist_tracks", "local_file_url", "VARCHAR(500) NULL")
+    ensure_column(cursor, "imported_playlist_tracks", "source_type", "VARCHAR(30) NOT NULL DEFAULT 'spotify'")
 
     connection.commit()
     cursor.close()

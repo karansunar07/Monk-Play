@@ -5,29 +5,20 @@
 {% block content %}
 <main class="auth-layout">
     <section class="auth-showcase">
-        <p class="eyebrow">Join the platform</p>
-        <h1>Create your account and build your own listening universe.</h1>
+        <p class="eyebrow">Create workspace</p>
+        <h1>Create your account and organize imported playlists.</h1>
         <p class="lead">
-            Save mixes, follow artists, and create a streaming-style experience powered by Flask.
+            Link accounts, import supported playlists, and keep track data available in your Flask app.
         </p>
         <div class="showcase-panel">
-            <strong>Included for new listeners</strong>
-            <p>Daily Mixes, Indie Radar, and private library access</p>
+            <strong>Included for new users</strong>
+            <p>Email login, Spotify linking, admin roles, and local playlist storage.</p>
         </div>
     </section>
 
     <section class="auth-card">
         <h1>Register</h1>
         <p class="lead">Create your account to get started.</p>
-
-        <a class="google-login-btn" href="{{ url_for('google_login') }}">
-            <span class="google-mark">G</span>
-            <span>Sign up with Google</span>
-        </a>
-
-        <div class="divider">
-            <span>or create an account with email</span>
-        </div>
 
         <form class="auth-form" method="post">
             <label for="name">Name</label>
@@ -41,10 +32,6 @@
 
             <button class="primary-btn full-width" type="submit">Register</button>
         </form>
-
-        {% if not google_login_enabled %}
-        <p class="config-hint">Google signup will work after you add your Google OAuth keys in `config.py`.</p>
-        {% endif %}
 
         <p class="auth-switch">Already have an account? <a href="{{ url_for('login') }}">Login</a></p>
     </section>
