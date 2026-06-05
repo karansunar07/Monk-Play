@@ -40,7 +40,8 @@ a {
 
 button,
 input,
-select {
+select,
+textarea {
     font: inherit;
 }
 
@@ -249,7 +250,8 @@ select {
 }
 
 .primary-btn,
-.ghost-btn {
+.ghost-btn,
+.danger-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -278,6 +280,22 @@ select {
 .ghost-btn:hover {
     border-color: var(--accent);
     color: var(--accent-strong);
+}
+
+.danger-btn {
+    border: 1px solid rgba(217, 111, 85, 0.55);
+    background: rgba(217, 111, 85, 0.12);
+    color: #a44532;
+}
+
+.danger-btn:hover:not(:disabled) {
+    background: var(--coral);
+    color: #ffffff;
+}
+
+.danger-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.48;
 }
 
 .stat-row {
@@ -516,6 +534,7 @@ select {
 }
 
 .auth-form input,
+.auth-form textarea,
 .auth-select {
     width: 100%;
     padding: 13px 14px;
@@ -526,9 +545,15 @@ select {
 }
 
 .auth-form input:focus,
+.auth-form textarea:focus,
 .auth-select:focus {
     border-color: var(--accent);
     outline: 3px solid rgba(31, 122, 118, 0.12);
+}
+
+.auth-form textarea {
+    min-height: 120px;
+    resize: vertical;
 }
 
 .auth-select option:disabled,
@@ -603,7 +628,7 @@ select {
 
 .admin-row {
     display: grid;
-    grid-template-columns: 1.1fr 1.5fr 150px 90px 110px;
+    grid-template-columns: 1.1fr 1.5fr 150px 90px 190px;
     gap: 14px;
     align-items: center;
     padding: 14px 16px;
@@ -623,6 +648,33 @@ select {
 .admin-row span {
     min-width: 0;
     overflow-wrap: anywhere;
+}
+
+.admin-row input {
+    width: 100%;
+    min-width: 0;
+    padding: 13px 14px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--ink);
+}
+
+.admin-row input:focus {
+    border-color: var(--accent);
+    outline: 3px solid rgba(31, 122, 118, 0.12);
+}
+
+.admin-row .danger-btn,
+.admin-row .ghost-btn {
+    min-height: 40px;
+    padding: 10px 13px;
+}
+
+.admin-row-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
 }
 
 .console-panel {
