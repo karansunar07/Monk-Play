@@ -21,6 +21,8 @@
         <p class="lead">Create your account to get started.</p>
 
         <form class="auth-form" method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
             <label for="name">Name</label>
             <input id="name" name="name" type="text" placeholder="Enter your name" required>
 

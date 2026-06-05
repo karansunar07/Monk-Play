@@ -42,6 +42,8 @@
             <p class="lead">Choose a playlist from the connected account and save it into your app.</p>
 
             <form class="auth-form" method="post">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
                 <label for="playlist_id">Available Spotify playlists</label>
                 <select id="playlist_id" name="playlist_id" class="auth-select" {% if not spotify_connected %}disabled{% endif %}>
                     <option value="">Select a playlist</option>
