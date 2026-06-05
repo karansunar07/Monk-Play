@@ -198,6 +198,54 @@
             </div>
         </section>
 
+        {% if is_admin %}
+        <section class="content-section" id="admin-tools">
+            <div class="section-head">
+                <div>
+                    <p class="eyebrow">Admin tools</p>
+                    <h2>Add music manually</h2>
+                </div>
+            </div>
+
+            <div class="auth-card">
+                <form class="auth-form" method="post" action="{{ url_for('add_manual_track_route') }}" enctype="multipart/form-data">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                    <label for="music_file">Music file</label>
+                    <input id="music_file" name="music_file" type="file" accept="audio/*" required>
+
+                    <label for="track_name">Title</label>
+                    <input id="track_name" name="track_name" type="text" placeholder="Enter music title" maxlength="255" required>
+
+                    <label for="track_description">Description</label>
+                    <textarea id="track_description" name="track_description" placeholder="Describe the music"></textarea>
+
+                    <label for="artist_names">Artist</label>
+                    <input id="artist_names" name="artist_names" type="text" placeholder="Enter artist name" maxlength="255">
+
+                    <label for="album_name">Album</label>
+                    <input id="album_name" name="album_name" type="text" placeholder="Enter album name" maxlength="255">
+
+                    <label for="spotify_url">Music link</label>
+                    <input id="spotify_url" name="spotify_url" type="url" placeholder="Optional Spotify or streaming link" maxlength="500">
+
+                    <div class="duration-grid">
+                        <div>
+                            <label for="duration_minutes">Minutes</label>
+                            <input id="duration_minutes" name="duration_minutes" type="number" min="0" value="0">
+                        </div>
+                        <div>
+                            <label for="duration_seconds">Seconds</label>
+                            <input id="duration_seconds" name="duration_seconds" type="number" min="0" max="59" value="0">
+                        </div>
+                    </div>
+
+                    <button class="primary-btn full-width" type="submit">Add music</button>
+                </form>
+            </div>
+        </section>
+        {% endif %}
+
     </section>
 </main>
 

@@ -84,6 +84,7 @@ def create_tables():
             track_name VARCHAR(255) NOT NULL,
             artist_names VARCHAR(255) NULL,
             album_name VARCHAR(255) NULL,
+            track_description TEXT NULL,
             spotify_url VARCHAR(500) NULL,
             local_file_url VARCHAR(500) NULL,
             source_type VARCHAR(30) NOT NULL DEFAULT 'spotify',
@@ -93,6 +94,7 @@ def create_tables():
         )
         """
     )
+    ensure_column(cursor, "imported_playlist_tracks", "track_description", "TEXT NULL")
     ensure_column(cursor, "imported_playlist_tracks", "local_file_url", "VARCHAR(500) NULL")
     ensure_column(cursor, "imported_playlist_tracks", "source_type", "VARCHAR(30) NOT NULL DEFAULT 'spotify'")
 
