@@ -5,8 +5,9 @@ from datetime import datetime
 from urllib.parse import urlencode
 
 import requests
-from flask import Flask, flash, has_request_context, redirect, render_template, request, session, url_for
+from flask import Flask, abort, flash, has_request_context, redirect, render_template, request, session, url_for
 from werkzeug.exceptions import HTTPException
+from werkzeug.utils import secure_filename
 from werkzeug.security import check_password_hash, generate_password_hash
 
 import config
@@ -15,6 +16,7 @@ from app.database import create_tables, get_connection
 BASE_DIR = os.path.dirname(__file__)
 TEMPLATE_DIR = os.path.join(BASE_DIR, "app", "templates")
 STATIC_DIR = os.path.join(BASE_DIR, "app", "statics")
+UPLOAD_DIR = os.path.join(STATIC_DIR, "uploads", "music")
 
 
 app = Flask(__name__, template_folder=TEMPLATE_DIR, static_folder=STATIC_DIR)
@@ -22,6 +24,7 @@ app.config["SECRET_KEY"] = config.SECRET_KEY
 
 SPOTIFY_SCOPES = "playlist-read-private playlist-read-collaborative user-read-private"
 APP_LOGS = deque(maxlen=120)
+ALLOWED_MUSIC_EXTENSIONS = {"mp3", "wav", "ogg", "m4a", "flac", "aac"}
 
 
 @app.context_processor
@@ -29,7 +32,25 @@ def inject_provider_state():
     return {
         "spotify_connected": bool(session.get("spotify_access_token")),
         "is_admin": session.get("user_role") == "admin",
+        "csrf_token": get_csrf_token,
     }
+
+
+def get_csrf_token():
+    token = session.get("csrf_token")
+    if not token:
+        token = secrets.token_urlsafe(32)
+        session["csrf_token"] = token
+    return token
+
+
+@app.before_request
+def verify_csrf_token():
+    if request.method == "POST":
+        sent_token = request.form.get("csrf_token", "")
+        session_token = session.get("csrf_token", "")
+        if not sent_token or not session_token or not secrets.compare_digest(sent_token, session_token):
+            abort(400, description="Invalid CSRF token.")
 
 
 def write_app_log(level, message, details=""):
@@ -112,6 +133,11 @@ def is_admin_user():
     return session.get("user_role") == "admin"
 
 
+def get_admin_count(cursor):
+    cursor.execute("SELECT COUNT(*) AS admin_count FROM users WHERE role = 'admin'")
+    return (cursor.fetchone() or {}).get("admin_count", 0)
+
+
 def get_admin_users():
     conn = get_connection()
     if conn is None:
@@ -132,6 +158,58 @@ def get_admin_users():
     cursor.close()
     conn.close()
     return users
+
+
+def is_allowed_music_file(filename):
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_MUSIC_EXTENSIONS
+
+
+def save_music_file(file_storage):
+    if not file_storage or not file_storage.filename:
+        return ""
+
+    if not is_allowed_music_file(file_storage.filename):
+        return None
+
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    filename = secure_filename(file_storage.filename)
+    unique_filename = f"{secrets.token_hex(8)}_{filename}"
+    file_storage.save(os.path.join(UPLOAD_DIR, unique_filename))
+    return url_for("static", filename=f"uploads/music/{unique_filename}")
+
+
+def get_or_create_manual_playlist(cursor, user_id):
+    manual_playlist_id = f"manual-music-{user_id}"
+    cursor.execute(
+        """
+        SELECT id FROM imported_playlists
+        WHERE user_id = %s AND spotify_playlist_id = %s
+        """,
+        (user_id, manual_playlist_id),
+    )
+    playlist = cursor.fetchone()
+    if playlist:
+        return playlist["id"]
+
+    cursor.execute(
+        """
+        INSERT INTO imported_playlists (
+            user_id, spotify_playlist_id, name, description, owner_name,
+            image_url, spotify_url, track_count
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        """,
+        (
+            user_id,
+            manual_playlist_id,
+            "Manual Music",
+            "Music added manually by an admin.",
+            session.get("user_name", "Admin"),
+            "",
+            "",
+            0,
+        ),
+    )
+    return cursor.lastrowid
 
 
 def get_dashboard_data(user_id, user_role):
@@ -194,34 +272,13 @@ def get_dashboard_data(user_id, user_role):
     return dashboard
 
 
-def add_manual_track(imported_playlist_id, user_id, track_data, is_admin=False):
+def add_manual_track(user_id, track_data):
     conn = get_connection()
     if conn is None:
         return False, "Database is not available right now."
 
     cursor = conn.cursor()
-    if is_admin:
-        cursor.execute(
-            """
-            SELECT id FROM imported_playlists
-            WHERE id = %s
-            """,
-            (imported_playlist_id,),
-        )
-    else:
-        cursor.execute(
-            """
-            SELECT id FROM imported_playlists
-            WHERE id = %s AND user_id = %s
-            """,
-            (imported_playlist_id, user_id),
-        )
-
-    playlist = cursor.fetchone()
-    if not playlist:
-        cursor.close()
-        conn.close()
-        return False, "That playlist could not be found."
+    imported_playlist_id = get_or_create_manual_playlist(cursor, user_id)
 
     cursor.execute(
         """
@@ -238,8 +295,9 @@ def add_manual_track(imported_playlist_id, user_id, track_data, is_admin=False):
         """
         INSERT INTO imported_playlist_tracks (
             imported_playlist_id, spotify_track_id, track_name, artist_names,
-            album_name, spotify_url, duration_ms, track_position
-        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            album_name, spotify_url, local_file_url, source_type,
+            track_description, duration_ms, track_position
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """,
         (
             imported_playlist_id,
@@ -248,6 +306,9 @@ def add_manual_track(imported_playlist_id, user_id, track_data, is_admin=False):
             track_data["artist_names"],
             track_data["album_name"],
             track_data["spotify_url"],
+            track_data["local_file_url"],
+            "manual",
+            track_data["track_description"],
             track_data["duration_ms"],
             next_position,
         ),
@@ -551,9 +612,7 @@ def update_user_role(user_id):
         return redirect(url_for("dashboard"))
 
     if user_id == session.get("user_id") and user.get("role") == "admin" and new_role == "user":
-        cursor.execute("SELECT COUNT(*) AS admin_count FROM users WHERE role = 'admin'")
-        admin_count = (cursor.fetchone() or {}).get("admin_count", 0)
-        if admin_count <= 1:
+        if get_admin_count(cursor) <= 1:
             cursor.close()
             conn.close()
             flash("You cannot remove the last admin account.", "danger")
@@ -571,6 +630,119 @@ def update_user_role(user_id):
     return redirect(url_for("dashboard"))
 
 
+@app.route("/admin/users/<int:user_id>/edit", methods=["POST"])
+def edit_user(user_id):
+    if not session.get("user_id"):
+        flash("Login first to manage users.", "danger")
+        return redirect(url_for("login"))
+
+    if not is_admin_user():
+        flash("Only admins can edit users.", "danger")
+        return redirect(url_for("dashboard"))
+
+    name = request.form.get("name", "").strip()
+    email = request.form.get("email", "").strip().lower()
+    role = request.form.get("role", "").strip().lower()
+
+    if not name or not email:
+        flash("User name and email are required.", "danger")
+        return redirect(url_for("dashboard"))
+    if len(name) > 100:
+        flash("Name must be less than 100 characters.", "danger")
+        return redirect(url_for("dashboard"))
+    if len(email) > 100:
+        flash("Email must be less than 100 characters.", "danger")
+        return redirect(url_for("dashboard"))
+    if role not in {"admin", "user"}:
+        flash("Choose a valid role.", "danger")
+        return redirect(url_for("dashboard"))
+
+    conn = get_connection()
+    if conn is None:
+        flash("Database is not available right now.", "danger")
+        return redirect(url_for("dashboard"))
+
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, role FROM users WHERE id = %s", (user_id,))
+    user = cursor.fetchone()
+    if not user:
+        cursor.close()
+        conn.close()
+        flash("That user could not be found.", "danger")
+        return redirect(url_for("dashboard"))
+
+    if user.get("role") == "admin" and role == "user" and get_admin_count(cursor) <= 1:
+        cursor.close()
+        conn.close()
+        flash("You cannot remove the last admin account.", "danger")
+        return redirect(url_for("dashboard"))
+
+    cursor.execute("SELECT id FROM users WHERE email = %s AND id != %s", (email, user_id))
+    if cursor.fetchone():
+        cursor.close()
+        conn.close()
+        flash("Another user already has that email address.", "danger")
+        return redirect(url_for("dashboard"))
+
+    cursor.execute(
+        "UPDATE users SET name = %s, email = %s, role = %s WHERE id = %s",
+        (name, email, role, user_id),
+    )
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    if user_id == session.get("user_id"):
+        session["user_name"] = name
+        session["user_role"] = role
+
+    flash("User updated.", "success")
+    return redirect(url_for("dashboard"))
+
+
+@app.route("/admin/users/<int:user_id>/delete", methods=["POST"])
+def delete_user(user_id):
+    if not session.get("user_id"):
+        flash("Login first to manage users.", "danger")
+        return redirect(url_for("login"))
+
+    if not is_admin_user():
+        flash("Only admins can delete users.", "danger")
+        return redirect(url_for("dashboard"))
+
+    if user_id == session.get("user_id"):
+        flash("You cannot delete your own account while logged in.", "danger")
+        return redirect(url_for("dashboard"))
+
+    conn = get_connection()
+    if conn is None:
+        flash("Database is not available right now.", "danger")
+        return redirect(url_for("dashboard"))
+
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, role FROM users WHERE id = %s", (user_id,))
+    user = cursor.fetchone()
+    if not user:
+        cursor.close()
+        conn.close()
+        flash("That user could not be found.", "danger")
+        return redirect(url_for("dashboard"))
+
+    if user.get("role") == "admin" and get_admin_count(cursor) <= 1:
+        cursor.close()
+        conn.close()
+        flash("You cannot delete the last admin account.", "danger")
+        return redirect(url_for("dashboard"))
+
+    cursor.execute("DELETE FROM users WHERE id = %s", (user_id,))
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    flash("User deleted.", "success")
+    return redirect(url_for("dashboard"))
+
+
 @app.route("/admin/manual-track", methods=["POST"])
 def add_manual_track_route():
     if not session.get("user_id"):
@@ -581,20 +753,36 @@ def add_manual_track_route():
         flash("Only admin accounts can add songs manually.", "danger")
         return redirect(url_for("home"))
 
-    playlist_id = request.form.get("imported_playlist_id", "").strip()
     track_name = request.form.get("track_name", "").strip()
+    track_description = request.form.get("track_description", "").strip()
     artist_names = request.form.get("artist_names", "").strip()
     album_name = request.form.get("album_name", "").strip()
     spotify_url = request.form.get("spotify_url", "").strip()
     duration_minutes = request.form.get("duration_minutes", "0").strip()
     duration_seconds = request.form.get("duration_seconds", "0").strip()
+    music_file_url = save_music_file(request.files.get("music_file"))
 
-    if not playlist_id or not track_name or not artist_names:
-        flash("Playlist, song name, and artist name are required.", "danger")
+    if music_file_url is None:
+        flash("Upload a valid music file: mp3, wav, ogg, m4a, flac, or aac.", "danger")
+        return redirect(url_for("home"))
+    if not music_file_url:
+        flash("Music file is required.", "danger")
+        return redirect(url_for("home"))
+
+    if not track_name:
+        flash("Song title is required.", "danger")
+        return redirect(url_for("home"))
+    if len(track_name) > 255:
+        flash("Song title must be less than 255 characters.", "danger")
+        return redirect(url_for("home"))
+    if len(artist_names) > 255 or len(album_name) > 255:
+        flash("Artist and album must be less than 255 characters.", "danger")
+        return redirect(url_for("home"))
+    if len(spotify_url) > 500 or len(music_file_url) > 500:
+        flash("Music file or link is too long.", "danger")
         return redirect(url_for("home"))
 
     try:
-        imported_playlist_id = int(playlist_id)
         minutes = max(int(duration_minutes or 0), 0)
         seconds = max(int(duration_seconds or 0), 0)
     except ValueError:
@@ -607,22 +795,19 @@ def add_manual_track_route():
 
     track_data = {
         "track_name": track_name,
+        "track_description": track_description,
         "artist_names": artist_names,
         "album_name": album_name,
         "spotify_url": spotify_url,
+        "local_file_url": music_file_url,
         "duration_ms": ((minutes * 60) + seconds) * 1000,
     }
-    saved, error_message = add_manual_track(
-        imported_playlist_id,
-        session.get("user_id"),
-        track_data,
-        is_admin=True,
-    )
+    saved, error_message = add_manual_track(session.get("user_id"), track_data)
     if not saved:
         flash(error_message or "The manual song could not be saved.", "danger")
         return redirect(url_for("home"))
 
-    flash("Song added manually to the playlist.", "success")
+    flash("Song added manually to your music library.", "success")
     return redirect(url_for("home"))
 
 
@@ -656,6 +841,54 @@ def login():
         return redirect(url_for("login"))
 
     return render_template("login.html")
+
+
+@app.route("/forgot-password", methods=["GET", "POST"])
+def forgot_password():
+    if request.method == "POST":
+        email = request.form.get("email", "").strip().lower()
+        password = request.form.get("password", "")
+        confirm_password = request.form.get("confirm_password", "")
+
+        if not email or not password or not confirm_password:
+            flash("Email, new password, and confirmation are required.", "danger")
+            return redirect(url_for("forgot_password"))
+        if len(email) > 100:
+            flash("Email must be less than 100 characters.", "danger")
+            return redirect(url_for("forgot_password"))
+        if len(password) < 6:
+            flash("Password must be at least 6 characters.", "danger")
+            return redirect(url_for("forgot_password"))
+        if password != confirm_password:
+            flash("Passwords do not match.", "danger")
+            return redirect(url_for("forgot_password"))
+
+        conn = get_connection()
+        if conn is None:
+            flash("Database is not available right now.", "danger")
+            return redirect(url_for("forgot_password"))
+
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM users WHERE email = %s", (email,))
+        user = cursor.fetchone()
+        if not user:
+            cursor.close()
+            conn.close()
+            flash("No account was found with that email.", "danger")
+            return redirect(url_for("forgot_password"))
+
+        cursor.execute(
+            "UPDATE users SET password = %s WHERE id = %s",
+            (generate_password_hash(password), user["id"]),
+        )
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        flash("Password updated. You can login with your new password.", "success")
+        return redirect(url_for("login"))
+
+    return render_template("forgot_password.html")
 
 
 @app.route("/spotify/connect")
