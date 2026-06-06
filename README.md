@@ -5,9 +5,12 @@ It now includes:
 
 - email login, user registration, and forgot password reset
 - CSRF protection for form submissions
+- cookie manipulation for saving, reading, and clearing browser preferences
 - Spotify playlist importing
 - admin user editing, role management, and user deletion
 - manual music uploads with title, description, artist, album, link, and duration fields
+- saved-track listing on the home page from the local database
+- a fixed music player bar with play, pause, skip, seek, shuffle, repeat, mute, and volume controls
 - an admin dashboard log console for active logs and errors
 
 ## Run locally
@@ -53,9 +56,23 @@ Admin accounts can manage users directly from the dashboard. The user table supp
 
 Manual music can be added from the home page admin tools section. The form accepts a music file and stores title, description, artist, album, optional music link, and duration. Manual music is saved into an internal `Manual Music` collection automatically, so admins do not need to choose a playlist.
 
+## Saved tracks and player
+
+The home page now reads saved tracks from the `imported_playlist_tracks` table instead of showing example rows. Tracks with an uploaded local file include a Play button and can be controlled from the fixed bottom player.
+
+The bottom player shows the current track title and artist, supports previous and next navigation, shuffle, repeat, progress seeking, mute, and volume control. It only appears when at least one saved track has a playable uploaded file.
+
 ## Security
 
 All POST forms include a CSRF token. The app validates the token before processing login, registration, password reset, admin actions, Spotify import, and manual music upload requests.
+
+## Cookie tools
+
+Open the cookie tools page to save a listener name and music preference in browser cookies, read the current cookie values, or clear the saved cookies:
+
+```text
+http://127.0.0.1:5000/cookies
+```
 
 ## Project structure
 
