@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}Cookie Tools | Monk Play{% endblock %}
+
+{% block content %}
+<main class="dashboard-layout">
+    <section class="dashboard-hero">
+        <div>
+            <p class="eyebrow">Cookie manipulation</p>
+            <h1>Save and clear browser preferences.</h1>
+            <p class="lead">
+                Store a small listener profile in browser cookies, read the saved values, and clear them when needed.
+            </p>
+        </div>
+
+        <div class="showcase-panel">
+            <strong>Current browser cookie</strong>
+            <p>
+                {% if listener_name or music_preference %}
+                This browser has saved Monk Play cookie preferences.
+                {% else %}
+                No Monk Play preference cookies are saved yet.
+                {% endif %}
+            </p>
+        </div>
+    </section>
+
+    <section class="cookie-grid">
+        <article class="auth-card">
+            <h2>Set cookies</h2>
+            <p class="lead">Choose values to save in this browser for 30 days.</p>
+
+            <form class="auth-form" method="post">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="action" value="save">
+
+                <label for="listener_name">Listener name</label>
+                <input id="listener_name" name="listener_name" type="text" value="{{ listener_name }}" placeholder="Enter listener name" maxlength="80" required>
+
+                <label for="music_preference">Music preference</label>
+                <input id="music_preference" name="music_preference" type="text" value="{{ music_preference }}" placeholder="Example: Lo-fi, rock, pop" maxlength="80" required>
+
+                <button class="primary-btn full-width" type="submit">Save cookies</button>
+            </form>
+        </article>
+
+        <article class="auth-card">
+            <h2>Read cookies</h2>
+            <p class="lead">These values are read from the current browser request.</p>
+
+            <div class="cookie-readout">
+                <div>
+                    <span>monk_listener_name</span>
+                    <strong>{{ listener_name or "Not set" }}</strong>
+                </div>
+                <div>
+                    <span>monk_music_preference</span>
+                    <strong>{{ music_preference or "Not set" }}</strong>
+                </div>
+            </div>
+
+            <form class="auth-form" method="post">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="action" value="clear">
+                <button class="danger-btn full-width" type="submit">Clear cookies</button>
+            </form>
+        </article>
+    </section>
+</main>
+{% endblock %}

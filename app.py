@@ -25,6 +25,7 @@ app.config["SECRET_KEY"] = config.SECRET_KEY
 SPOTIFY_SCOPES = "playlist-read-private playlist-read-collaborative user-read-private"
 APP_LOGS = deque(maxlen=120)
 ALLOWED_MUSIC_EXTENSIONS = {"mp3", "wav", "ogg", "m4a", "flac", "aac"}
+COOKIE_MAX_AGE = 60 * 60 * 24 * 30
 
 
 @app.context_processor
@@ -127,6 +128,41 @@ def get_imported_playlists(user_id):
     cursor.close()
     conn.close()
     return playlists
+
+
+def get_saved_tracks(user_id):
+    if not user_id:
+        return []
+
+    conn = get_connection()
+    if conn is None:
+        return []
+
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT
+            imported_playlist_tracks.track_name,
+            imported_playlist_tracks.artist_names,
+            imported_playlist_tracks.album_name,
+            imported_playlist_tracks.spotify_url,
+            imported_playlist_tracks.local_file_url,
+            imported_playlist_tracks.source_type,
+            imported_playlist_tracks.duration_ms,
+            imported_playlists.name AS playlist_name
+        FROM imported_playlist_tracks
+        JOIN imported_playlists
+            ON imported_playlists.id = imported_playlist_tracks.imported_playlist_id
+        WHERE imported_playlists.user_id = %s
+        ORDER BY imported_playlist_tracks.id DESC
+        LIMIT 12
+        """,
+        (user_id,),
+    )
+    tracks = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    return tracks
 
 
 def is_admin_user():
@@ -558,10 +594,14 @@ def save_imported_playlist(user_id, playlist_data, tracks):
 @app.route("/")
 def home():
     imported_playlists = get_imported_playlists(session.get("user_id"))
+    saved_tracks = get_saved_tracks(session.get("user_id"))
+    first_playable_track = next((track for track in saved_tracks if track.get("local_file_url")), None)
     return render_template(
         "home.html",
         user_name=session.get("user_name"),
         imported_playlists=imported_playlists,
+        saved_tracks=saved_tracks,
+        first_playable_track=first_playable_track,
     )
 
 
@@ -579,6 +619,52 @@ def dashboard():
         dashboard_data=dashboard_data,
         admin_users=get_admin_users() if is_admin_user() else [],
         app_logs=list(APP_LOGS) if is_admin_user() else [],
+    )
+
+
+@app.route("/cookies", methods=["GET", "POST"])
+def cookie_tools():
+    if request.method == "POST":
+        action = request.form.get("action", "save")
+        response = redirect(url_for("cookie_tools"))
+
+        if action == "clear":
+            response.delete_cookie("monk_listener_name")
+            response.delete_cookie("monk_music_preference")
+            flash("Saved cookies cleared from this browser.", "success")
+            return response
+
+        listener_name = request.form.get("listener_name", "").strip()
+        music_preference = request.form.get("music_preference", "").strip()
+
+        if not listener_name or not music_preference:
+            flash("Listener name and music preference are required.", "danger")
+            return redirect(url_for("cookie_tools"))
+        if len(listener_name) > 80 or len(music_preference) > 80:
+            flash("Cookie values must be less than 80 characters.", "danger")
+            return redirect(url_for("cookie_tools"))
+
+        response.set_cookie(
+            "monk_listener_name",
+            listener_name,
+            max_age=COOKIE_MAX_AGE,
+            httponly=True,
+            samesite="Lax",
+        )
+        response.set_cookie(
+            "monk_music_preference",
+            music_preference,
+            max_age=COOKIE_MAX_AGE,
+            httponly=True,
+            samesite="Lax",
+        )
+        flash("Cookie values saved in this browser.", "success")
+        return response
+
+    return render_template(
+        "cookies.html",
+        listener_name=request.cookies.get("monk_listener_name", ""),
+        music_preference=request.cookies.get("monk_music_preference", ""),
     )
 
 
