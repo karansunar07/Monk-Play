@@ -1,4 +1,4 @@
-from flask import flash, redirect, render_template, request, url_for
+from flask import flash, redirect, render_template, request, session, url_for
 
 
 COOKIE_MAX_AGE = 60 * 60 * 24 * 30
@@ -13,6 +13,14 @@ def register_user():
 
 
 def cookie_tools():
+    if not session.get("user_id"):
+        flash("Login first to open cookie tools.", "danger")
+        return redirect(url_for("auth.login"))
+
+    if session.get("user_role") != "admin":
+        flash("Only admins can open cookie tools.", "danger")
+        return redirect(url_for("auth.home"))
+
     if request.method == "POST":
         action = request.form.get("action", "save")
         response = redirect(url_for(request.endpoint))

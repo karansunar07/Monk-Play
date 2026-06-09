@@ -624,6 +624,14 @@ def dashboard():
 
 @app.route("/cookies", methods=["GET", "POST"])
 def cookie_tools():
+    if not session.get("user_id"):
+        flash("Login first to open cookie tools.", "danger")
+        return redirect(url_for("login"))
+
+    if not is_admin_user():
+        flash("Only admins can open cookie tools.", "danger")
+        return redirect(url_for("home"))
+
     if request.method == "POST":
         action = request.form.get("action", "save")
         response = redirect(url_for("cookie_tools"))
