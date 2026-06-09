@@ -68,7 +68,7 @@ All POST forms include a CSRF token. The app validates the token before processi
 
 ## Cookie tools
 
-Open the cookie tools page to save a listener name and music preference in browser cookies, read the current cookie values, or clear the saved cookies:
+Admin users can open the cookie tools page directly by URL to save a listener name and music preference in browser cookies, read the current cookie values, or clear the saved cookies:
 
 ```text
 http://127.0.0.1:5000/cookies
