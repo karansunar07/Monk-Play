@@ -405,6 +405,10 @@ textarea {
     overflow: hidden;
 }
 
+.feature-grid {
+    margin-top: 16px;
+}
+
 .imported-image,
 .import-cover {
     display: block;
@@ -506,10 +510,32 @@ textarea {
     background: var(--accent-strong);
 }
 
+.track-play-btn.secondary {
+    background: var(--surface);
+    color: var(--muted);
+}
+
+.track-play-btn.secondary:hover {
+    background: var(--surface-muted);
+    color: var(--ink);
+}
+
 .track-play-btn.disabled {
     background: var(--surface-muted);
     color: var(--muted);
     cursor: default;
+}
+
+.spotify-embed-panel {
+    grid-column: 1 / -1;
+}
+
+.spotify-embed-panel iframe {
+    display: block;
+    width: 100%;
+    min-height: 152px;
+    border: 0;
+    border-radius: 8px;
 }
 
 .music-player {
