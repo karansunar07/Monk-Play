@@ -39,7 +39,7 @@
 
         <div class="auth-card">
             <h2>2. Choose a playlist</h2>
-            <p class="lead">Choose a playlist from the connected account and save it into your app.</p>
+            <p class="lead">Choose a playlist from the connected account or paste a Spotify playlist link.</p>
 
             <form class="auth-form" method="post">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -48,13 +48,21 @@
                 <select id="playlist_id" name="playlist_id" class="auth-select" {% if not spotify_connected %}disabled{% endif %}>
                     <option value="">Select a playlist</option>
                     {% for playlist in spotify_playlists %}
-                    <option value="{{ playlist.get('id') }}" {% if not playlist.get('can_import_tracks') %}disabled{% endif %}>
+                    <option value="{{ playlist.get('id') }}">
                         {{ playlist.get('name', 'Untitled Playlist') }}
                         ({{ playlist.get('tracks', {}).get('total', 0) }} tracks)
-                        {% if not playlist.get('can_import_tracks') %}- make a copy to import{% endif %}
                     </option>
                     {% endfor %}
                 </select>
+
+                <label for="playlist_url">Playlist link or ID</label>
+                <input
+                    id="playlist_url"
+                    name="playlist_url"
+                    type="text"
+                    placeholder="https://open.spotify.com/playlist/..."
+                    {% if not spotify_connected %}disabled{% endif %}
+                >
 
                 <button class="primary-btn full-width" type="submit" {% if not spotify_connected %}disabled{% endif %}>
                     Import playlist
