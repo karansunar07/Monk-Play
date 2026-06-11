@@ -78,19 +78,41 @@
         <section class="content-section" id="playlists">
             <div class="section-head">
                 <div>
-                    <p class="eyebrow">Workspace sections</p>
-                    <h2>Built around playlist management</h2>
+                    <p class="eyebrow">Shared playlists</p>
+                    <h2>Imported playlists everyone can browse</h2>
                 </div>
             </div>
 
             <div class="playlist-grid">
+                {% if imported_playlists %}
+                {% for playlist in imported_playlists %}
+                <article class="playlist-card">
+                    {% if playlist.image_url %}
+                    <img class="imported-image" src="{{ playlist.image_url }}" alt="{{ playlist.name }}">
+                    {% else %}
+                    <div class="cover cover-one"></div>
+                    {% endif %}
+                    <div class="card-body">
+                        <h3>{{ playlist.name }}</h3>
+                        <p>{{ playlist.owner_name or "Unknown owner" }} | {{ playlist.track_count }} tracks</p>
+                        {% if playlist.spotify_url %}
+                        <a class="ghost-btn inline-btn" href="{{ playlist.spotify_url }}" target="_blank" rel="noreferrer">Open on Spotify</a>
+                        {% endif %}
+                    </div>
+                </article>
+                {% endfor %}
+                {% else %}
                 <article class="playlist-card">
                     <div class="cover cover-one"></div>
                     <div class="card-body">
-                        <h3>Imported Playlists</h3>
-                        <p>Review playlist owners, artwork, links, and total track counts.</p>
+                        <h3>No imported playlists yet</h3>
+                        <p>Import a Spotify playlist to make it visible for everyone here.</p>
                     </div>
                 </article>
+                {% endif %}
+            </div>
+
+            <div class="playlist-grid feature-grid">
                 <article class="playlist-card">
                     <div class="cover cover-two"></div>
                     <div class="card-body">
@@ -140,14 +162,35 @@
                         </div>
                     </div>
                     {% if track.local_file_url %}
-                    <button class="track-play-btn" type="button" aria-label="Play {{ track.track_name }}">Play</button>
+                    <button
+                        class="track-play-btn"
+                        type="button"
+                        data-play-label="{% if track.source_type == 'spotify' %}Preview{% else %}Play{% endif %}"
+                        aria-label="Play {{ track.track_name }}"
+                    >
+                        {% if track.source_type == "spotify" %}Preview{% else %}Play{% endif %}
+                    </button>
+                    {% elif track.spotify_track_id %}
+                    <button
+                        class="track-play-btn secondary spotify-embed-btn"
+                        type="button"
+                        data-embed-url="https://open.spotify.com/embed/track/{{ track.spotify_track_id }}?utm_source=generator"
+                        aria-label="Play {{ track.track_name }} on this page"
+                    >
+                        Play here
+                    </button>
+                    {% elif track.spotify_url %}
+                    <span class="track-play-btn disabled">No audio</span>
                     {% else %}
-                    <span class="track-play-btn disabled">No file</span>
+                    <span class="track-play-btn disabled">No audio</span>
                     {% endif %}
                     <span class="track-tag">{{ track.album_name or track.playlist_name or "Manual" }}</span>
                     <span class="track-time">
                         {{ (track.duration_ms // 60000) }}:{{ "%02d"|format((track.duration_ms // 1000) % 60) }}
                     </span>
+                    {% if track.spotify_track_id and not track.local_file_url %}
+                    <div class="spotify-embed-panel" hidden></div>
+                    {% endif %}
                 </div>
                 {% endfor %}
                 {% else %}
