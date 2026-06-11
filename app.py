@@ -2,7 +2,7 @@ import os
 import secrets
 from collections import deque
 from datetime import datetime
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 
 import requests
 from flask import Flask, abort, flash, has_request_context, redirect, render_template, request, session, url_for
@@ -106,59 +106,64 @@ def get_role_for_new_user(cursor):
     return "admin" if (result.get("total") or 0) == 0 else "user"
 
 
-def get_imported_playlists(user_id):
-    if not user_id:
-        return []
-
+def get_imported_playlists(user_id=None):
     conn = get_connection()
     if conn is None:
         return []
 
     cursor = conn.cursor()
-    cursor.execute(
-        """
-        SELECT id, spotify_playlist_id, name, owner_name, image_url, spotify_url, track_count
-        FROM imported_playlists
-        WHERE user_id = %s
-        ORDER BY id DESC
-        """,
-        (user_id,),
-    )
+    if user_id:
+        cursor.execute(
+            """
+            SELECT id, spotify_playlist_id, name, owner_name, image_url, spotify_url, track_count
+            FROM imported_playlists
+            WHERE user_id = %s
+            ORDER BY id DESC
+            """,
+            (user_id,),
+        )
+    else:
+        cursor.execute(
+            """
+            SELECT id, spotify_playlist_id, name, owner_name, image_url, spotify_url, track_count
+            FROM imported_playlists
+            ORDER BY id DESC
+            LIMIT 12
+            """
+        )
     playlists = cursor.fetchall()
     cursor.close()
     conn.close()
     return playlists
 
 
-def get_saved_tracks(user_id):
-    if not user_id:
-        return []
-
+def get_saved_tracks(user_id=None):
     conn = get_connection()
     if conn is None:
         return []
 
     cursor = conn.cursor()
-    cursor.execute(
-        """
+    query = """
         SELECT
+            imported_playlist_tracks.spotify_track_id,
             imported_playlist_tracks.track_name,
             imported_playlist_tracks.artist_names,
             imported_playlist_tracks.album_name,
-            imported_playlist_tracks.spotify_url,
-            imported_playlist_tracks.local_file_url,
-            imported_playlist_tracks.source_type,
-            imported_playlist_tracks.duration_ms,
-            imported_playlists.name AS playlist_name
-        FROM imported_playlist_tracks
-        JOIN imported_playlists
-            ON imported_playlists.id = imported_playlist_tracks.imported_playlist_id
-        WHERE imported_playlists.user_id = %s
-        ORDER BY imported_playlist_tracks.id DESC
-        LIMIT 12
-        """,
-        (user_id,),
-    )
+        imported_playlist_tracks.spotify_url,
+        imported_playlist_tracks.local_file_url,
+        imported_playlist_tracks.source_type,
+        imported_playlist_tracks.duration_ms,
+        imported_playlists.name AS playlist_name
+    FROM imported_playlist_tracks
+    JOIN imported_playlists
+        ON imported_playlists.id = imported_playlist_tracks.imported_playlist_id
+    """
+    params = ()
+    if user_id:
+        query += "WHERE imported_playlists.user_id = %s "
+        params = (user_id,)
+    query += "ORDER BY imported_playlist_tracks.id DESC LIMIT 12"
+    cursor.execute(query, params)
     tracks = cursor.fetchall()
     cursor.close()
     conn.close()
@@ -418,24 +423,41 @@ def spotify_get_with_refresh(endpoint, params=None):
     return spotify_api_get(endpoint, refreshed_access_token, params=params)
 
 
+def extract_spotify_playlist_id(raw_value):
+    value = (raw_value or "").strip()
+    if not value:
+        return ""
+
+    if value.startswith("spotify:playlist:"):
+        return value.rsplit(":", 1)[-1].strip()
+
+    parsed = urlparse(value)
+    if parsed.netloc and parsed.path:
+        path_parts = [part for part in parsed.path.split("/") if part]
+        if "playlist" in path_parts:
+            playlist_index = path_parts.index("playlist")
+            if len(path_parts) > playlist_index + 1:
+                return path_parts[playlist_index + 1].strip()
+
+    return value.split("?", 1)[0].split("#", 1)[0].strip()
+
+
 def get_spotify_playlists():
-    response = spotify_get_with_refresh("me/playlists", params={"limit": 20})
-    if response is None or response.status_code != 200:
-        return []
+    playlists = []
+    offset = 0
 
-    payload = response.json()
-    playlists = payload.get("items", [])
+    while True:
+        response = spotify_get_with_refresh("me/playlists", params={"limit": 50, "offset": offset})
+        if response is None or response.status_code != 200:
+            return playlists
 
-    profile_response = spotify_get_with_refresh("me")
-    current_user_id = ""
-    if profile_response is not None and profile_response.status_code == 200:
-        current_user_id = profile_response.json().get("id", "")
+        payload = response.json()
+        page_items = payload.get("items", [])
+        playlists.extend(page_items)
 
-    for playlist in playlists:
-        owner_id = (playlist.get("owner") or {}).get("id", "")
-        playlist["can_import_tracks"] = bool(
-            current_user_id and (owner_id == current_user_id or playlist.get("collaborative"))
-        )
+        if not payload.get("next") or not page_items:
+            break
+        offset += len(page_items)
 
     return playlists
 
@@ -497,6 +519,7 @@ def fetch_playlist_tracks(playlist_id, token):
                     "artists": artists,
                     "album": album,
                     "spotify_url": (track.get("external_urls") or {}).get("spotify", ""),
+                    "preview_url": track.get("preview_url", ""),
                     "duration_ms": track.get("duration_ms", 0),
                 }
             )
@@ -570,8 +593,9 @@ def save_imported_playlist(user_id, playlist_data, tracks):
             """
             INSERT INTO imported_playlist_tracks (
                 imported_playlist_id, spotify_track_id, track_name, artist_names,
-                album_name, spotify_url, duration_ms, track_position
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                album_name, spotify_url, local_file_url, source_type,
+                duration_ms, track_position
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 playlist_row_id,
@@ -580,6 +604,8 @@ def save_imported_playlist(user_id, playlist_data, tracks):
                 track["artists"],
                 track["album"],
                 track["spotify_url"],
+                track.get("preview_url", ""),
+                "spotify",
                 track["duration_ms"],
                 position,
             ),
@@ -593,8 +619,8 @@ def save_imported_playlist(user_id, playlist_data, tracks):
 
 @app.route("/")
 def home():
-    imported_playlists = get_imported_playlists(session.get("user_id"))
-    saved_tracks = get_saved_tracks(session.get("user_id"))
+    imported_playlists = get_imported_playlists()
+    saved_tracks = get_saved_tracks()
     first_playable_track = next((track for track in saved_tracks if track.get("local_file_url")), None)
     return render_template(
         "home.html",
@@ -1033,7 +1059,17 @@ def spotify_callback():
     )
 
     if response.status_code != 200:
-        flash("Could not connect to Spotify. Check your client keys and redirect URI.", "danger")
+        error_details = ""
+        try:
+            error_payload = response.json()
+            error_details = error_payload.get("error_description") or error_payload.get("error") or ""
+        except ValueError:
+            error_details = response.text[:160]
+
+        if error_details:
+            flash(f"Could not connect to Spotify: {error_details}", "danger")
+        else:
+            flash("Could not connect to Spotify. Check your client keys and redirect URI.", "danger")
         return redirect(url_for("spotify_import"))
 
     token_data = response.json()
@@ -1065,7 +1101,9 @@ def spotify_import():
         spotify_playlists = get_spotify_playlists()
 
     if request.method == "POST":
-        playlist_id = request.form.get("playlist_id", "").strip()
+        playlist_id = extract_spotify_playlist_id(
+            request.form.get("playlist_url", "") or request.form.get("playlist_id", "")
+        )
         access_token = session.get("spotify_access_token")
 
         if not access_token:
@@ -1082,12 +1120,20 @@ def spotify_import():
             return redirect(url_for("spotify_import"))
 
         if playlist_response.status_code != 200:
+            error_details = ""
+            try:
+                error_details = (playlist_response.json().get("error") or {}).get("message", "")
+            except ValueError:
+                error_details = ""
+
             if playlist_response.status_code == 401:
                 flash("Your Spotify session expired. Reconnect Spotify and try again.", "danger")
             elif playlist_response.status_code == 403:
                 flash("Spotify denied access to that playlist for the connected account.", "danger")
             elif playlist_response.status_code == 404:
                 flash("Spotify could not find that playlist.", "danger")
+            elif error_details:
+                flash(f"That playlist could not be loaded from Spotify: {error_details}", "danger")
             else:
                 flash("That playlist could not be loaded from Spotify right now.", "danger")
             return redirect(url_for("spotify_import"))
