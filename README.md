@@ -56,9 +56,21 @@ Admin accounts can manage users directly from the dashboard. The user table supp
 
 Manual music can be added from the home page admin tools section. The form accepts a music file and stores title, description, artist, album, optional music link, and duration. Manual music is saved into an internal `Manual Music` collection automatically, so admins do not need to choose a playlist.
 
+## Spotify import
+
+Set the Spotify app credentials in `config.py` and make sure the redirect URI in the Spotify developer dashboard exactly matches:
+
+```text
+http://127.0.0.1:5000/spotify/callback
+```
+
+After connecting Spotify, the import page lists all readable playlists from the connected account. You can also paste a Spotify playlist URL or playlist ID directly into the import form.
+
+Imported playlists and their saved tracks are visible on the home page for all users. Spotify does not provide full song files through this API, so the site plays Spotify preview audio when Spotify includes a preview URL. Tracks without preview audio can open an embedded Spotify player directly on the site.
+
 ## Saved tracks and player
 
-The home page now reads saved tracks from the `imported_playlist_tracks` table instead of showing example rows. Tracks with an uploaded local file include a Play button and can be controlled from the fixed bottom player.
+The home page now reads saved tracks from the `imported_playlist_tracks` table instead of showing example rows. Tracks with an uploaded local file or Spotify preview URL include a Play button and can be controlled from the fixed bottom player. Imported Spotify tracks without preview audio show an in-page Spotify embed.
 
 The bottom player shows the current track title and artist, supports previous and next navigation, shuffle, repeat, progress seeking, mute, and volume control. It only appears when at least one saved track has a playable uploaded file.
 
