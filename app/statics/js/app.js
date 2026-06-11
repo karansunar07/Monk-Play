@@ -41,7 +41,9 @@ if (audioPlayer && playableRows.length) {
             row.classList.toggle("active-track", isActive);
             const button = row.querySelector(".track-play-btn");
             if (button) {
-                button.textContent = isActive && !audioPlayer.paused ? "Pause" : "Play";
+                button.textContent = isActive && !audioPlayer.paused
+                    ? "Pause"
+                    : button.dataset.playLabel || "Play";
             }
         });
     };
@@ -176,3 +178,37 @@ if (audioPlayer && playableRows.length) {
     audioPlayer.volume = Number(volumeRange.value);
     loadTrack(0, false);
 }
+
+document.querySelectorAll(".spotify-embed-btn").forEach((button) => {
+    button.addEventListener("click", () => {
+        const row = button.closest(".playable-track");
+        const panel = row ? row.querySelector(".spotify-embed-panel") : null;
+        if (!panel) {
+            return;
+        }
+
+        const isOpening = panel.hidden;
+        document.querySelectorAll(".spotify-embed-panel").forEach((openPanel) => {
+            openPanel.hidden = true;
+        });
+        document.querySelectorAll(".spotify-embed-btn").forEach((embedButton) => {
+            embedButton.textContent = "Play here";
+        });
+
+        if (!isOpening) {
+            return;
+        }
+
+        if (!panel.querySelector("iframe")) {
+            const iframe = document.createElement("iframe");
+            iframe.src = button.dataset.embedUrl;
+            iframe.loading = "lazy";
+            iframe.allow = "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture";
+            iframe.title = "Spotify embedded player";
+            panel.appendChild(iframe);
+        }
+
+        panel.hidden = false;
+        button.textContent = "Hide player";
+    });
+});
