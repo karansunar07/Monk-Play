@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}All Songs | Monk Play{% endblock %}
+
+{% block content %}
+<main class="app-shell single-column">
+    <section class="main-panel">
+        <section class="content-section">
+            <div class="section-head">
+                <div>
+                    <p class="eyebrow">Library</p>
+                    <h1>All songs</h1>
+                </div>
+            </div>
+
+            {% include "partials/track_table.html" %}
+        </section>
+
+        {% include "partials/music_player.html" %}
+    </section>
+</main>
+{% endblock %}
