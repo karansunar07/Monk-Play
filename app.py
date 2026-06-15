@@ -137,7 +137,7 @@ def get_imported_playlists(user_id=None):
     return playlists
 
 
-def get_saved_tracks(user_id=None):
+def get_saved_tracks(user_id=None, limit=12):
     conn = get_connection()
     if conn is None:
         return []
@@ -151,9 +151,10 @@ def get_saved_tracks(user_id=None):
             imported_playlist_tracks.album_name,
         imported_playlist_tracks.spotify_url,
         imported_playlist_tracks.local_file_url,
-        imported_playlist_tracks.source_type,
-        imported_playlist_tracks.duration_ms,
-        imported_playlists.name AS playlist_name
+            imported_playlist_tracks.source_type,
+            imported_playlist_tracks.duration_ms,
+            imported_playlists.image_url AS playlist_image_url,
+            imported_playlists.name AS playlist_name
     FROM imported_playlist_tracks
     JOIN imported_playlists
         ON imported_playlists.id = imported_playlist_tracks.imported_playlist_id
@@ -162,7 +163,10 @@ def get_saved_tracks(user_id=None):
     if user_id:
         query += "WHERE imported_playlists.user_id = %s "
         params = (user_id,)
-    query += "ORDER BY imported_playlist_tracks.id DESC LIMIT 12"
+    query += "ORDER BY imported_playlist_tracks.id DESC "
+    if limit:
+        query += "LIMIT %s"
+        params = params + (limit,)
     cursor.execute(query, params)
     tracks = cursor.fetchall()
     cursor.close()
@@ -620,12 +624,29 @@ def save_imported_playlist(user_id, playlist_data, tracks):
 @app.route("/")
 def home():
     imported_playlists = get_imported_playlists()
-    saved_tracks = get_saved_tracks()
-    first_playable_track = next((track for track in saved_tracks if track.get("local_file_url")), None)
+    saved_tracks = get_saved_tracks(limit=12)
+    first_playable_track = next(
+        (track for track in saved_tracks if track.get("local_file_url") or track.get("spotify_track_id")),
+        None,
+    )
     return render_template(
         "home.html",
         user_name=session.get("user_name"),
         imported_playlists=imported_playlists,
+        saved_tracks=saved_tracks,
+        first_playable_track=first_playable_track,
+    )
+
+
+@app.route("/songs")
+def songs():
+    saved_tracks = get_saved_tracks(limit=None)
+    first_playable_track = next(
+        (track for track in saved_tracks if track.get("local_file_url") or track.get("spotify_track_id")),
+        None,
+    )
+    return render_template(
+        "songs.html",
         saved_tracks=saved_tracks,
         first_playable_track=first_playable_track,
     )
