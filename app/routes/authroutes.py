@@ -1,6 +1,6 @@
-from flask import Blueprint, render_template
+from flask import Blueprint
 
-from app.controllers.authcontroller import cookie_tools, login_user, register_user
+from app.controllers import authcontroller
 
 
 auth_bp = Blueprint("auth", __name__)
@@ -8,19 +8,19 @@ auth_bp = Blueprint("auth", __name__)
 
 @auth_bp.route("/")
 def home():
-    return render_template("home.html")
+    return authcontroller.home_page()
 
 
 @auth_bp.route("/login")
 def login():
-    return login_user()
+    return authcontroller.login_page()
 
 
 @auth_bp.route("/register")
 def register():
-    return register_user()
+    return authcontroller.register_page()
 
 
 @auth_bp.route("/cookies", methods=["GET", "POST"], endpoint="cookie_tools_route")
 def cookies():
-    return cookie_tools()
+    return authcontroller.cookie_tools()
