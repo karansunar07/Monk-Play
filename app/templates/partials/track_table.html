@@ -1,0 +1,61 @@
+<div class="track-table">
+    {% if saved_tracks %}
+    {% for track in saved_tracks %}
+    <div class="track-row playable-track"
+        data-title="{{ track.track_name }}"
+        data-artist="{{ track.artist_names or 'Unknown artist' }}"
+        data-album="{{ track.album_name or track.playlist_name or 'Manual' }}"
+        data-src="{{ track.local_file_url or '' }}"
+        data-embed-url="{% if track.spotify_track_id and not track.local_file_url %}https://open.spotify.com/embed/track/{{ track.spotify_track_id }}?utm_source=generator{% endif %}"
+        data-cover="{{ track.playlist_image_url or '' }}"
+        data-duration="{{ track.duration_ms or 0 }}">
+        <div class="track-main">
+            <span class="track-number">{{ loop.index }}</span>
+            <div>
+                <h3>{{ track.track_name }}</h3>
+                <p>{{ track.artist_names or "Unknown artist" }}</p>
+            </div>
+        </div>
+        {% if track.local_file_url %}
+        <button
+            class="track-play-btn"
+            type="button"
+            data-play-label="{% if track.source_type == 'spotify' %}Preview{% else %}Play{% endif %}"
+            aria-label="Play {{ track.track_name }}"
+        >
+            {% if track.source_type == "spotify" %}Preview{% else %}Play{% endif %}
+        </button>
+        {% elif track.spotify_track_id %}
+        <button
+            class="track-play-btn spotify-track-btn"
+            type="button"
+            data-play-label="Play"
+            aria-label="Play {{ track.track_name }}"
+        >
+            Play
+        </button>
+        {% elif track.spotify_url %}
+        <span class="track-play-btn disabled">No audio</span>
+        {% else %}
+        <span class="track-play-btn disabled">No audio</span>
+        {% endif %}
+        <span class="track-tag">{{ track.album_name or track.playlist_name or "Manual" }}</span>
+        <span class="track-time">
+            {{ (track.duration_ms // 60000) }}:{{ "%02d"|format((track.duration_ms // 1000) % 60) }}
+        </span>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="track-row">
+        <div class="track-main">
+            <span class="track-number">0</span>
+            <div>
+                <h3>No saved tracks yet</h3>
+                <p>Add music manually or import a Spotify playlist to see it here.</p>
+            </div>
+        </div>
+        <span class="track-tag">Empty</span>
+        <span class="track-time">0:00</span>
+    </div>
+    {% endif %}
+</div>
