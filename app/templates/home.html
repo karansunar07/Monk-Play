@@ -145,68 +145,7 @@
                 </div>
             </div>
 
-            <div class="track-table">
-                {% if saved_tracks %}
-                {% for track in saved_tracks %}
-                <div class="track-row playable-track"
-                    data-title="{{ track.track_name }}"
-                    data-artist="{{ track.artist_names or 'Unknown artist' }}"
-                    data-album="{{ track.album_name or track.playlist_name or 'Manual' }}"
-                    data-src="{{ track.local_file_url or '' }}"
-                    data-duration="{{ track.duration_ms or 0 }}">
-                    <div class="track-main">
-                        <span class="track-number">{{ loop.index }}</span>
-                        <div>
-                            <h3>{{ track.track_name }}</h3>
-                            <p>{{ track.artist_names or "Unknown artist" }}</p>
-                        </div>
-                    </div>
-                    {% if track.local_file_url %}
-                    <button
-                        class="track-play-btn"
-                        type="button"
-                        data-play-label="{% if track.source_type == 'spotify' %}Preview{% else %}Play{% endif %}"
-                        aria-label="Play {{ track.track_name }}"
-                    >
-                        {% if track.source_type == "spotify" %}Preview{% else %}Play{% endif %}
-                    </button>
-                    {% elif track.spotify_track_id %}
-                    <button
-                        class="track-play-btn secondary spotify-embed-btn"
-                        type="button"
-                        data-embed-url="https://open.spotify.com/embed/track/{{ track.spotify_track_id }}?utm_source=generator"
-                        aria-label="Play {{ track.track_name }} on this page"
-                    >
-                        Play here
-                    </button>
-                    {% elif track.spotify_url %}
-                    <span class="track-play-btn disabled">No audio</span>
-                    {% else %}
-                    <span class="track-play-btn disabled">No audio</span>
-                    {% endif %}
-                    <span class="track-tag">{{ track.album_name or track.playlist_name or "Manual" }}</span>
-                    <span class="track-time">
-                        {{ (track.duration_ms // 60000) }}:{{ "%02d"|format((track.duration_ms // 1000) % 60) }}
-                    </span>
-                    {% if track.spotify_track_id and not track.local_file_url %}
-                    <div class="spotify-embed-panel" hidden></div>
-                    {% endif %}
-                </div>
-                {% endfor %}
-                {% else %}
-                <div class="track-row">
-                    <div class="track-main">
-                        <span class="track-number">0</span>
-                        <div>
-                            <h3>No saved tracks yet</h3>
-                            <p>Add music manually or import a Spotify playlist to see it here.</p>
-                        </div>
-                    </div>
-                    <span class="track-tag">Empty</span>
-                    <span class="track-time">0:00</span>
-                </div>
-                {% endif %}
-            </div>
+            {% include "partials/track_table.html" %}
         </section>
 
         <section class="content-section" id="artists">
@@ -284,39 +223,7 @@
         </section>
         {% endif %}
 
-        {% if first_playable_track %}
-        <section class="music-player" aria-label="Music player">
-            <div class="player-now">
-                <div class="player-cover" aria-hidden="true">MP</div>
-                <div>
-                    <strong id="player-title">{{ first_playable_track.track_name }}</strong>
-                    <span id="player-artist">{{ first_playable_track.artist_names or "Unknown artist" }}</span>
-                </div>
-            </div>
-
-            <div class="player-center">
-                <div class="player-controls">
-                    <button id="shuffle-btn" type="button" aria-label="Shuffle">Shuffle</button>
-                    <button id="prev-btn" type="button" aria-label="Previous track">Prev</button>
-                    <button id="play-pause-btn" class="player-main-btn" type="button" aria-label="Play">Play</button>
-                    <button id="next-btn" type="button" aria-label="Next track">Next</button>
-                    <button id="repeat-btn" type="button" aria-label="Repeat">Repeat</button>
-                </div>
-                <div class="player-progress">
-                    <span id="current-time">0:00</span>
-                    <input id="progress-range" type="range" min="0" max="100" value="0" step="0.1" aria-label="Track progress">
-                    <span id="total-time">0:00</span>
-                </div>
-            </div>
-
-            <div class="player-tools">
-                <button id="mute-btn" type="button" aria-label="Mute">Vol</button>
-                <input id="volume-range" type="range" min="0" max="1" value="0.8" step="0.01" aria-label="Volume">
-            </div>
-
-            <audio id="site-audio-player" preload="metadata"></audio>
-        </section>
-        {% endif %}
+        {% include "partials/music_player.html" %}
 
     </section>
 </main>
