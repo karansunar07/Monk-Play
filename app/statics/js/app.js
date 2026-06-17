@@ -4,13 +4,18 @@ document.querySelectorAll(".flash-message").forEach((message) => {
 
 const audioPlayer = document.querySelector("#site-audio-player");
 const playableRows = Array.from(document.querySelectorAll(".playable-track")).filter(
-    (row) => row.dataset.src
+    (row) => row.dataset.src || row.dataset.embedUrl
 );
 
 if (audioPlayer && playableRows.length) {
+    const musicPlayer = document.querySelector(".music-player");
     const titleEl = document.querySelector("#player-title");
     const artistEl = document.querySelector("#player-artist");
+    const coverEl = document.querySelector("#player-cover");
+    const embedWrap = document.querySelector("#player-embed-wrap");
+    const spotifyEmbed = document.querySelector("#player-spotify-embed");
     const playPauseBtn = document.querySelector("#play-pause-btn");
+    const closePlayerBtn = document.querySelector("#close-player-btn");
     const prevBtn = document.querySelector("#prev-btn");
     const nextBtn = document.querySelector("#next-btn");
     const shuffleBtn = document.querySelector("#shuffle-btn");
@@ -41,7 +46,7 @@ if (audioPlayer && playableRows.length) {
             row.classList.toggle("active-track", isActive);
             const button = row.querySelector(".track-play-btn");
             if (button) {
-                button.textContent = isActive && !audioPlayer.paused
+                button.textContent = isActive && (!audioPlayer.paused || row.dataset.embedUrl)
                     ? "Pause"
                     : button.dataset.playLabel || "Play";
             }
@@ -51,12 +56,41 @@ if (audioPlayer && playableRows.length) {
     const loadTrack = (index, shouldPlay = false) => {
         currentIndex = (index + playableRows.length) % playableRows.length;
         const track = playableRows[currentIndex].dataset;
-        audioPlayer.src = track.src;
         titleEl.textContent = track.title || "Untitled track";
         artistEl.textContent = track.artist || "Unknown artist";
+        if (coverEl && coverEl.tagName === "IMG" && track.cover) {
+            coverEl.src = track.cover;
+        }
         totalTimeEl.textContent = formatTime(Number(track.duration || 0) / 1000);
         progressRange.value = 0;
         currentTimeEl.textContent = "0:00";
+        musicPlayer.classList.remove("is-hidden");
+        musicPlayer.classList.toggle("has-embed", Boolean(track.embedUrl));
+
+        if (track.embedUrl) {
+            audioPlayer.pause();
+            audioPlayer.removeAttribute("src");
+            audioPlayer.load();
+            if (spotifyEmbed && spotifyEmbed.src !== track.embedUrl) {
+                spotifyEmbed.src = track.embedUrl;
+            }
+            if (embedWrap) {
+                embedWrap.hidden = false;
+            }
+            playPauseBtn.classList.remove("playing");
+            playPauseBtn.setAttribute("aria-label", "Play in Spotify embed");
+            setActiveRow();
+            return;
+        }
+
+        if (embedWrap) {
+            embedWrap.hidden = true;
+        }
+        musicPlayer.classList.remove("has-embed");
+        if (spotifyEmbed) {
+            spotifyEmbed.removeAttribute("src");
+        }
+        audioPlayer.src = track.src;
         setActiveRow();
 
         if (shouldPlay) {
@@ -71,6 +105,11 @@ if (audioPlayer && playableRows.length) {
     const togglePlay = () => {
         if (!audioPlayer.src) {
             loadTrack(currentIndex, true);
+            return;
+        }
+
+        if (playableRows[currentIndex].dataset.embedUrl) {
+            loadTrack(currentIndex, false);
             return;
         }
 
@@ -102,7 +141,7 @@ if (audioPlayer && playableRows.length) {
         }
 
         button.addEventListener("click", () => {
-            if (index === currentIndex && audioPlayer.src) {
+            if (index === currentIndex && audioPlayer.src && !row.dataset.embedUrl) {
                 togglePlay();
                 return;
             }
@@ -112,6 +151,12 @@ if (audioPlayer && playableRows.length) {
     });
 
     playPauseBtn.addEventListener("click", togglePlay);
+    if (closePlayerBtn) {
+        closePlayerBtn.addEventListener("click", () => {
+            audioPlayer.pause();
+            musicPlayer.classList.add("is-hidden");
+        });
+    }
     prevBtn.addEventListener("click", () => loadTrack(currentIndex - 1, true));
     nextBtn.addEventListener("click", playNext);
 
@@ -178,37 +223,3 @@ if (audioPlayer && playableRows.length) {
     audioPlayer.volume = Number(volumeRange.value);
     loadTrack(0, false);
 }
-
-document.querySelectorAll(".spotify-embed-btn").forEach((button) => {
-    button.addEventListener("click", () => {
-        const row = button.closest(".playable-track");
-        const panel = row ? row.querySelector(".spotify-embed-panel") : null;
-        if (!panel) {
-            return;
-        }
-
-        const isOpening = panel.hidden;
-        document.querySelectorAll(".spotify-embed-panel").forEach((openPanel) => {
-            openPanel.hidden = true;
-        });
-        document.querySelectorAll(".spotify-embed-btn").forEach((embedButton) => {
-            embedButton.textContent = "Play here";
-        });
-
-        if (!isOpening) {
-            return;
-        }
-
-        if (!panel.querySelector("iframe")) {
-            const iframe = document.createElement("iframe");
-            iframe.src = button.dataset.embedUrl;
-            iframe.loading = "lazy";
-            iframe.allow = "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture";
-            iframe.title = "Spotify embedded player";
-            panel.appendChild(iframe);
-        }
-
-        panel.hidden = false;
-        button.textContent = "Hide player";
-    });
-});
