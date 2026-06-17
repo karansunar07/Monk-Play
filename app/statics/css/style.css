@@ -262,6 +262,10 @@ textarea {
     font-weight: 800;
 }
 
+.app-shell.single-column {
+    grid-template-columns: minmax(0, 1fr);
+}
+
 .primary-btn {
     border: 1px solid var(--accent-strong);
     background: var(--accent);
@@ -526,18 +530,6 @@ textarea {
     cursor: default;
 }
 
-.spotify-embed-panel {
-    grid-column: 1 / -1;
-}
-
-.spotify-embed-panel iframe {
-    display: block;
-    width: 100%;
-    min-height: 152px;
-    border: 0;
-    border-radius: 8px;
-}
-
 .music-player {
     position: fixed;
     left: 0;
@@ -545,8 +537,8 @@ textarea {
     bottom: 0;
     z-index: 40;
     display: grid;
-    grid-template-columns: minmax(220px, 1fr) minmax(280px, 2fr) minmax(180px, 1fr);
-    gap: 22px;
+    grid-template-columns: minmax(260px, 0.9fr) minmax(360px, 1.8fr) minmax(140px, 0.7fr);
+    gap: 16px;
     align-items: center;
     padding: 12px 22px;
     min-height: 92px;
@@ -554,6 +546,31 @@ textarea {
     color: #ffffff;
     border-top: 1px solid rgba(255, 255, 255, 0.12);
     box-shadow: 0 -16px 38px rgba(0, 0, 0, 0.32);
+}
+
+.player-embed-wrap {
+    width: min(420px, 100%);
+}
+
+.player-embed-wrap iframe {
+    display: block;
+    width: 100%;
+    height: 80px;
+    border: 0;
+    border-radius: 8px;
+}
+
+.music-player.has-embed .player-controls,
+.music-player.has-embed .player-progress {
+    display: none;
+}
+
+.music-player.has-embed .player-center {
+    gap: 0;
+}
+
+.music-player.is-hidden {
+    display: none;
 }
 
 .player-now,
@@ -567,7 +584,7 @@ textarea {
 
 .player-now {
     min-width: 0;
-    gap: 12px;
+    gap: 9px;
 }
 
 .player-now strong,
@@ -589,8 +606,8 @@ textarea {
 }
 
 .player-cover {
-    width: 56px;
-    height: 56px;
+    width: 48px;
+    height: 48px;
     flex: 0 0 auto;
     display: grid;
     place-items: center;
@@ -602,11 +619,29 @@ textarea {
     font-family: "Syne", sans-serif;
     font-weight: 800;
     font-size: 0.82rem;
+    object-fit: cover;
+}
+
+.player-mini-btn {
+    width: 24px;
+    height: 24px;
+    display: grid;
+    place-items: center;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: #b5b5b5;
+    cursor: pointer;
+    font-size: 0;
+}
+
+.player-mini-btn:hover {
+    color: #ffffff;
 }
 
 .player-center {
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
     justify-content: center;
 }
 
@@ -617,8 +652,8 @@ textarea {
 
 .player-controls button,
 .player-tools button {
-    width: 34px;
-    height: 34px;
+    width: 30px;
+    height: 30px;
     display: grid;
     place-items: center;
     border: 0;
@@ -644,6 +679,16 @@ textarea {
 .player-tools button::before {
     font-size: 1rem;
     line-height: 1;
+}
+
+#close-player-btn::before {
+    content: "x";
+    font-size: 1.15rem;
+}
+
+#save-track-btn::before {
+    content: "+";
+    font-size: 1.15rem;
 }
 
 #shuffle-btn::before {
@@ -714,11 +759,11 @@ textarea {
 
 .player-tools {
     justify-content: end;
-    gap: 10px;
+    gap: 8px;
 }
 
 #volume-range {
-    width: 120px;
+    width: 90px;
 }
 
 .artist-card {
