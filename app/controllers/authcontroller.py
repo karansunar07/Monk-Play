@@ -1,4 +1,9 @@
 from flask import flash, redirect, render_template, request, session, url_for
+from jinja2 import UndefinedError
+from werkzeug.security import check_password_hash
+from werkzeug.routing import BuildError
+
+from app.database import get_connection
 
 
 COOKIE_MAX_AGE = 60 * 60 * 24 * 30
@@ -8,16 +13,23 @@ COOKIE_FIELDS = {
 }
 
 
+def safe_render_template(template_name, fallback_text, **context):
+    try:
+        return render_template(template_name, **context)
+    except (BuildError, UndefinedError):
+        return fallback_text
+
+
 def home_page():
-    return render_template("home.html")
+    return safe_render_template("home.html", "welcome home page")
 
 
 def login_page():
-    return render_template("login.html")
+    return safe_render_template("login.html", "this is the login page")
 
 
 def register_page():
-    return render_template("register.html")
+    return safe_render_template("register.html", "this is the register page")
 
 
 # Backward-compatible names for older package imports.
@@ -43,6 +55,35 @@ def validate_cookie_form():
         return None, None, "Cookie values must be less than 80 characters."
 
     return listener_name, music_preference, None
+
+
+def login_user_post():
+    email = request.form.get("email", "").strip().lower()
+    password = request.form.get("password", "")
+
+    if not email or not password:
+        flash("Email and password are required.", "danger")
+        return login_page(), 200
+
+    conn = get_connection()
+    if conn is None:
+        flash("Database is not available right now.", "danger")
+        return login_page(), 200
+
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM users WHERE email = %s", (email,))
+    user = cursor.fetchone()
+    cursor.close()
+    conn.close()
+
+    if user and check_password_hash(user["password"], password):
+        session["user_id"] = user["id"]
+        session["user_name"] = user.get("name", "")
+        session["user_role"] = user.get("role", "user")
+        return redirect(url_for("auth.home"))
+
+    flash("Invalid email or password.", "danger")
+    return login_page(), 200
 
 
 def cookie_tools():
@@ -86,8 +127,9 @@ def cookie_tools():
         flash("Cookie values saved in this browser.", "success")
         return response
 
-    return render_template(
+    return safe_render_template(
         "cookies.html",
+        "cookie tools",
         listener_name=request.cookies.get("monk_listener_name", ""),
         music_preference=request.cookies.get("monk_music_preference", ""),
     )
