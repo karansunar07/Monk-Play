@@ -28,7 +28,7 @@ if (audioPlayer && playableRows.length) {
     let currentIndex = 0;
     let isShuffle = false;
     let isRepeat = false;
-    let wasMutedVolume = Number(volumeRange.value) || 0.8;
+    let wasMutedVolume = Number(localStorage.getItem("monkPlayerVolume")) || Number(volumeRange.value) || 0.8;
 
     const formatTime = (seconds) => {
         if (!Number.isFinite(seconds) || seconds < 0) {
@@ -46,7 +46,12 @@ if (audioPlayer && playableRows.length) {
             row.classList.toggle("active-track", isActive);
             const button = row.querySelector(".track-play-btn");
             if (button) {
-                button.textContent = isActive && (!audioPlayer.paused || row.dataset.embedUrl)
+                if (row.dataset.embedUrl) {
+                    button.textContent = isActive ? "Spotify open" : button.dataset.playLabel || "Spotify";
+                    return;
+                }
+
+                button.textContent = isActive && !audioPlayer.paused
                     ? "Pause"
                     : button.dataset.playLabel || "Play";
             }
@@ -71,6 +76,9 @@ if (audioPlayer && playableRows.length) {
             audioPlayer.pause();
             audioPlayer.removeAttribute("src");
             audioPlayer.load();
+            volumeRange.disabled = true;
+            muteBtn.disabled = true;
+            muteBtn.setAttribute("aria-label", "Spotify embed volume is controlled inside Spotify");
             if (spotifyEmbed && spotifyEmbed.src !== track.embedUrl) {
                 spotifyEmbed.src = track.embedUrl;
             }
@@ -78,7 +86,7 @@ if (audioPlayer && playableRows.length) {
                 embedWrap.hidden = false;
             }
             playPauseBtn.classList.remove("playing");
-            playPauseBtn.setAttribute("aria-label", "Play in Spotify embed");
+            playPauseBtn.setAttribute("aria-label", "Use the Spotify player below");
             setActiveRow();
             return;
         }
@@ -87,10 +95,14 @@ if (audioPlayer && playableRows.length) {
             embedWrap.hidden = true;
         }
         musicPlayer.classList.remove("has-embed");
+        volumeRange.disabled = false;
+        muteBtn.disabled = false;
+        muteBtn.setAttribute("aria-label", audioPlayer.muted ? "Unmute" : "Mute");
         if (spotifyEmbed) {
             spotifyEmbed.removeAttribute("src");
         }
         audioPlayer.src = track.src;
+        audioPlayer.volume = Number(volumeRange.value);
         setActiveRow();
 
         if (shouldPlay) {
@@ -109,7 +121,9 @@ if (audioPlayer && playableRows.length) {
         }
 
         if (playableRows[currentIndex].dataset.embedUrl) {
-            loadTrack(currentIndex, false);
+            if (embedWrap) {
+                embedWrap.hidden = false;
+            }
             return;
         }
 
@@ -178,11 +192,20 @@ if (audioPlayer && playableRows.length) {
         audioPlayer.currentTime = (Number(progressRange.value) / 100) * audioPlayer.duration;
     });
 
-    volumeRange.addEventListener("input", () => {
-        audioPlayer.volume = Number(volumeRange.value);
+    const applyVolume = () => {
+        const nextVolume = Number(volumeRange.value);
+        audioPlayer.volume = nextVolume;
         audioPlayer.muted = audioPlayer.volume === 0;
+        if (nextVolume > 0) {
+            wasMutedVolume = nextVolume;
+        }
+        localStorage.setItem("monkPlayerVolume", String(nextVolume));
         muteBtn.classList.toggle("muted", audioPlayer.muted);
-    });
+        muteBtn.setAttribute("aria-label", audioPlayer.muted ? "Unmute" : "Mute");
+    };
+
+    volumeRange.addEventListener("input", applyVolume);
+    volumeRange.addEventListener("change", applyVolume);
 
     muteBtn.addEventListener("click", () => {
         if (audioPlayer.muted || audioPlayer.volume === 0) {
@@ -196,6 +219,8 @@ if (audioPlayer && playableRows.length) {
         }
 
         muteBtn.classList.toggle("muted", audioPlayer.muted);
+        muteBtn.setAttribute("aria-label", audioPlayer.muted ? "Unmute" : "Mute");
+        localStorage.setItem("monkPlayerVolume", String(Number(volumeRange.value)));
     });
 
     audioPlayer.addEventListener("loadedmetadata", () => {
@@ -220,6 +245,7 @@ if (audioPlayer && playableRows.length) {
         playNext();
     });
 
-    audioPlayer.volume = Number(volumeRange.value);
+    volumeRange.value = wasMutedVolume;
+    audioPlayer.volume = wasMutedVolume;
     loadTrack(0, false);
 }
