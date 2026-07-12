@@ -44,6 +44,12 @@ If you want to create them manually, run:
 mysql -u root -p < schema.sql
 ```
 
+You can also run the helper script:
+
+```powershell
+.\scripts\setup_mysql.ps1 -User root -HostName localhost
+```
+
 4. Start the Flask app:
 
 ```powershell
@@ -65,6 +71,16 @@ http://127.0.0.1:5000/dashboard
 ```
 
 Admins can edit user details, update roles, delete users, add manual music uploads, and view active logs and errors.
+
+## MySQL records
+
+Monk Play stores its persistent records in MySQL:
+
+- `users` keeps registered accounts, password hashes, roles, and optional profile metadata.
+- `imported_playlists` keeps Spotify and manual playlist records.
+- `imported_playlist_tracks` keeps imported tracks, uploaded local file links, descriptions, source type, and duration.
+
+If the app starts but no records save, confirm that MySQL is running and that the `MYSQL_USER` in `config.py` can create and write to the configured `MYSQL_DATABASE`.
 
 ## Admin tools
 
@@ -106,6 +122,7 @@ http://127.0.0.1:5000/cookies
 
 - `app.py` - Flask routes, login, password reset, playlist import, admin tools, CSRF checks, and log capture
 - `schema.sql` - MySQL database and table setup for all saved records
+- `scripts/setup_mysql.ps1` - PowerShell helper for applying the schema
 - `app/templates/` - Jinja HTML templates
 - `app/statics/css/style.css` - app styling
 - `app/statics/js/app.js` - small UI helpers
