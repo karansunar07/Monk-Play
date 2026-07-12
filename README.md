@@ -28,13 +28,29 @@ venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-3. Start the Flask app:
+3. Configure MySQL in `config.py`:
+
+```python
+MYSQL_HOST = "localhost"
+MYSQL_USER = "root"
+MYSQL_PASSWORD = "root"
+MYSQL_DATABASE = "flask_crud"
+```
+
+The app creates the configured MySQL database and tables automatically on startup.
+If you want to create them manually, run:
+
+```powershell
+mysql -u root -p < schema.sql
+```
+
+4. Start the Flask app:
 
 ```powershell
 python app.py
 ```
 
-4. Open this URL in your browser:
+5. Open this URL in your browser:
 
 ```text
 http://127.0.0.1:5000
@@ -89,6 +105,7 @@ http://127.0.0.1:5000/cookies
 ## Project structure
 
 - `app.py` - Flask routes, login, password reset, playlist import, admin tools, CSRF checks, and log capture
+- `schema.sql` - MySQL database and table setup for all saved records
 - `app/templates/` - Jinja HTML templates
 - `app/statics/css/style.css` - app styling
 - `app/statics/js/app.js` - small UI helpers

@@ -3,6 +3,19 @@ import pymysql
 import config
 
 
+def get_server_connection():
+    try:
+        return pymysql.connect(
+            host=config.MYSQL_HOST,
+            user=config.MYSQL_USER,
+            password=config.MYSQL_PASSWORD,
+            cursorclass=pymysql.cursors.DictCursor,
+            autocommit=False,
+        )
+    except pymysql.MySQLError:
+        return None
+
+
 def get_connection():
     try:
         connection = pymysql.connect(
@@ -16,6 +29,22 @@ def get_connection():
         return connection
     except pymysql.MySQLError:
         return None
+
+
+def create_database():
+    connection = get_server_connection()
+    if connection is None:
+        return False
+
+    cursor = connection.cursor()
+    cursor.execute(
+        f"CREATE DATABASE IF NOT EXISTS `{config.MYSQL_DATABASE}` "
+        "CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+    )
+    connection.commit()
+    cursor.close()
+    connection.close()
+    return True
 
 
 def ensure_column(cursor, table_name, column_name, definition):
@@ -34,6 +63,7 @@ def ensure_column(cursor, table_name, column_name, definition):
 
 
 def create_tables():
+    create_database()
     connection = get_connection()
     if connection is None:
         return
