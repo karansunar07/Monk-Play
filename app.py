@@ -261,9 +261,15 @@ def get_dashboard_data(user_id, user_role):
     dashboard = {
         "playlist_count": 0,
         "track_count": 0,
+        "local_track_count": 0,
+        "spotify_track_count": 0,
+        "manual_track_count": 0,
         "recent_playlists": [],
+        "recent_tracks": [],
         "user_count": 0,
         "admin_count": 0,
+        "log_count": len(APP_LOGS),
+        "error_count": sum(1 for log in APP_LOGS if log.get("level") == "error"),
         "spotify_connected": bool(session.get("spotify_access_token")),
     }
 
@@ -275,45 +281,89 @@ def get_dashboard_data(user_id, user_role):
         return dashboard
 
     cursor = conn.cursor()
-    cursor.execute(
-        """
-        SELECT COUNT(*) AS playlist_count, COALESCE(SUM(track_count), 0) AS track_count
-        FROM imported_playlists
-        WHERE user_id = %s
-        """,
-        (user_id,),
-    )
-    personal_totals = cursor.fetchone() or {}
-    dashboard["playlist_count"] = personal_totals.get("playlist_count", 0)
-    dashboard["track_count"] = personal_totals.get("track_count", 0)
+    try:
+        cursor.execute(
+            """
+            SELECT COUNT(*) AS playlist_count, COALESCE(SUM(track_count), 0) AS track_count
+            FROM imported_playlists
+            WHERE user_id = %s
+            """,
+            (user_id,),
+        )
+        personal_totals = cursor.fetchone() or {}
+        dashboard["playlist_count"] = personal_totals.get("playlist_count", 0)
+        dashboard["track_count"] = personal_totals.get("track_count", 0)
 
-    cursor.execute(
-        """
-        SELECT name, owner_name, track_count, spotify_url
-        FROM imported_playlists
-        WHERE user_id = %s
-        ORDER BY id DESC
-        LIMIT 4
-        """,
-        (user_id,),
-    )
-    dashboard["recent_playlists"] = cursor.fetchall()
-
-    if user_role == "admin":
         cursor.execute(
             """
             SELECT
-                COUNT(*) AS user_count,
-                SUM(CASE WHEN role = 'admin' THEN 1 ELSE 0 END) AS admin_count
-            FROM users
-            """
+                COUNT(*) AS saved_track_count,
+                SUM(CASE WHEN imported_playlist_tracks.local_file_url IS NOT NULL
+                    AND imported_playlist_tracks.local_file_url != '' THEN 1 ELSE 0 END) AS local_track_count,
+                SUM(CASE WHEN imported_playlist_tracks.source_type = 'manual' THEN 1 ELSE 0 END) AS manual_track_count,
+                SUM(CASE WHEN imported_playlist_tracks.spotify_track_id IS NOT NULL
+                    AND imported_playlist_tracks.spotify_track_id != '' THEN 1 ELSE 0 END) AS spotify_track_count
+            FROM imported_playlist_tracks
+            INNER JOIN imported_playlists
+                ON imported_playlists.id = imported_playlist_tracks.imported_playlist_id
+            WHERE imported_playlists.user_id = %s
+            """,
+            (user_id,),
         )
-        admin_totals = cursor.fetchone() or {}
-        dashboard["user_count"] = admin_totals.get("user_count", 0)
-        dashboard["admin_count"] = admin_totals.get("admin_count", 0)
+        track_totals = cursor.fetchone() or {}
+        dashboard["local_track_count"] = track_totals.get("local_track_count") or 0
+        dashboard["manual_track_count"] = track_totals.get("manual_track_count") or 0
+        dashboard["spotify_track_count"] = track_totals.get("spotify_track_count") or 0
+        dashboard["track_count"] = track_totals.get("saved_track_count") or dashboard["track_count"]
 
-    cursor.close()
-    conn.close()
+        cursor.execute(
+            """
+            SELECT name, owner_name, track_count, spotify_url, image_url
+            FROM imported_playlists
+            WHERE user_id = %s
+            ORDER BY id DESC
+            LIMIT 5
+            """,
+            (user_id,),
+        )
+        dashboard["recent_playlists"] = cursor.fetchall()
+
+        cursor.execute(
+            """
+            SELECT
+                imported_playlist_tracks.track_name,
+                imported_playlist_tracks.artist_names,
+                imported_playlist_tracks.album_name,
+                imported_playlist_tracks.local_file_url,
+                imported_playlist_tracks.spotify_url,
+                imported_playlist_tracks.source_type,
+                imported_playlists.name AS playlist_name
+            FROM imported_playlist_tracks
+            INNER JOIN imported_playlists
+                ON imported_playlists.id = imported_playlist_tracks.imported_playlist_id
+            WHERE imported_playlists.user_id = %s
+            ORDER BY imported_playlist_tracks.id DESC
+            LIMIT 6
+            """,
+            (user_id,),
+        )
+        dashboard["recent_tracks"] = cursor.fetchall()
+
+        if user_role == "admin":
+            cursor.execute(
+                """
+                SELECT
+                    COUNT(*) AS user_count,
+                    SUM(CASE WHEN role = 'admin' THEN 1 ELSE 0 END) AS admin_count
+                FROM users
+                """
+            )
+            admin_totals = cursor.fetchone() or {}
+            dashboard["user_count"] = admin_totals.get("user_count", 0)
+            dashboard["admin_count"] = admin_totals.get("admin_count", 0)
+    finally:
+        cursor.close()
+        conn.close()
     return dashboard
 
 
