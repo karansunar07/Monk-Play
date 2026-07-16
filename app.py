@@ -361,6 +361,8 @@ def get_dashboard_data(user_id, user_role):
             admin_totals = cursor.fetchone() or {}
             dashboard["user_count"] = admin_totals.get("user_count", 0)
             dashboard["admin_count"] = admin_totals.get("admin_count", 0)
+    except Exception as error:
+        write_app_log("error", "Dashboard data could not be loaded", str(error))
     finally:
         cursor.close()
         conn.close()
