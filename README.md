@@ -11,7 +11,7 @@ It now includes:
 - manual music uploads with title, description, artist, album, link, and duration fields
 - saved-track listing on the home page from the local database
 - a fixed music player bar with play, pause, skip, seek, shuffle, repeat, mute, and volume controls
-- an admin dashboard log console for active logs and errors
+- a dark dashboard with library stats, recent playlists, recent songs, admin user controls, and active log health
 
 ## Run locally
 
@@ -70,7 +70,9 @@ Open the dashboard after logging in:
 http://127.0.0.1:5000/dashboard
 ```
 
-Admins can edit user details, update roles, delete users, add manual music uploads, and view active logs and errors.
+The dashboard shows playlist totals, saved-track totals, local upload counts, manual song counts, recent playlists, and recent songs.
+
+Admins can edit user details, update roles, delete users, add manual music uploads, open cookie tools, and view active logs and errors.
 
 ## MySQL records
 
