@@ -3,101 +3,150 @@
 {% block title %}Dashboard | Monk Play{% endblock %}
 
 {% block content %}
-<main class="dashboard-layout">
-    <section class="dashboard-hero">
-        <div>
-            <p class="eyebrow">{{ user_role|title }} dashboard</p>
-            <h1>Welcome back, {{ user_name }}.</h1>
-            <p class="lead">
-                Track your playlists, monitor your library, and keep your Monk Play account organized.
-            </p>
-        </div>
-
-        <div class="showcase-panel">
-            <strong>Spotify status</strong>
+<main class="dashboard-layout dashboard-command">
+    <section class="dash-hero">
+        <div class="dash-hero-copy">
+            <p class="dash-kicker">{{ user_role|title }} workspace</p>
+            <h1>Good to see you, {{ user_name }}.</h1>
             <p>
-                {% if dashboard_data.spotify_connected %}
-                Spotify is connected and ready for imports.
-                {% else %}
-                Spotify is not connected yet. Link your account to import playlists.
-                {% endif %}
+                Your library, account tools, imports, and admin signals are collected here in one calm control room.
             </p>
-        </div>
-    </section>
-
-    <section class="dashboard-grid">
-        <article class="dashboard-card">
-            <p class="eyebrow">Library</p>
-            <h2>{{ dashboard_data.playlist_count }}</h2>
-            <p>Imported playlists in your account.</p>
-        </article>
-
-        <article class="dashboard-card">
-            <p class="eyebrow">Tracks</p>
-            <h2>{{ dashboard_data.track_count }}</h2>
-            <p>Total saved tracks across your imported playlists.</p>
-        </article>
-
-        <article class="dashboard-card">
-            <p class="eyebrow">Connection</p>
-            <h2>{% if dashboard_data.spotify_connected %}Live{% else %}Offline{% endif %}</h2>
-            <p>{% if dashboard_data.spotify_connected %}Ready to pull Spotify data.{% else %}Reconnect Spotify to keep syncing.{% endif %}</p>
-        </article>
-
-        {% if user_role == "admin" %}
-        <article class="dashboard-card accent-card">
-            <p class="eyebrow">Admin</p>
-            <h2>{{ dashboard_data.user_count }}</h2>
-            <p>Total registered accounts, including {{ dashboard_data.admin_count }} admin users.</p>
-        </article>
-        {% endif %}
-    </section>
-
-    <section class="content-section">
-        <div class="section-head">
-            <div>
-                <p class="eyebrow">Recent playlists</p>
-                <h2>Your latest imports</h2>
-            </div>
-            <div class="hero-actions">
-                <a class="ghost-btn" href="{{ url_for('home') }}">Back home</a>
-                <a class="primary-btn" href="{{ url_for('spotify_import') }}">Import more</a>
+            <div class="dash-actions">
+                <a class="primary-btn" href="{{ url_for('songs') }}">Open songs</a>
+                <a class="ghost-btn" href="{{ url_for('spotify_import') }}">Import playlist</a>
             </div>
         </div>
 
-        {% if dashboard_data.recent_playlists %}
-        <div class="dashboard-list">
-            {% for playlist in dashboard_data.recent_playlists %}
-            <article class="dashboard-list-item">
-                <div>
-                    <h3>{{ playlist.name }}</h3>
-                    <p>{{ playlist.owner_name or "Unknown owner" }}</p>
-                </div>
-                <span class="track-tag">{{ playlist.track_count }} tracks</span>
-                {% if playlist.spotify_url %}
-                <a class="ghost-btn inline-btn" href="{{ playlist.spotify_url }}" target="_blank" rel="noreferrer">Open on Spotify</a>
+        <aside class="dash-status-card">
+            <span class="status-light {% if dashboard_data.spotify_connected %}online{% endif %}"></span>
+            <p>Spotify connection</p>
+            <strong>{% if dashboard_data.spotify_connected %}Connected{% else %}Not connected{% endif %}</strong>
+            <small>
+                {% if dashboard_data.spotify_connected %}
+                Ready to import and play Spotify tracks on the site.
+                {% else %}
+                Connect Spotify from the importer when you want playlist sync.
                 {% endif %}
-            </article>
-            {% endfor %}
-        </div>
-        {% else %}
-        <div class="empty-import-state">
-            <p>No imported playlists yet. Bring one in from Spotify to populate your dashboard.</p>
-            <a class="primary-btn" href="{{ url_for('spotify_import') }}">Import a playlist</a>
-        </div>
+            </small>
+        </aside>
+    </section>
+
+    <section class="dash-stat-grid" aria-label="Dashboard summary">
+        <article class="dash-stat-card">
+            <span>Playlists</span>
+            <strong>{{ dashboard_data.playlist_count }}</strong>
+            <small>Imported collections</small>
+        </article>
+        <article class="dash-stat-card">
+            <span>Tracks</span>
+            <strong>{{ dashboard_data.track_count }}</strong>
+            <small>Saved in Monk Play</small>
+        </article>
+        <article class="dash-stat-card">
+            <span>Local files</span>
+            <strong>{{ dashboard_data.local_track_count }}</strong>
+            <small>Playable uploads</small>
+        </article>
+        <article class="dash-stat-card">
+            <span>Manual adds</span>
+            <strong>{{ dashboard_data.manual_track_count }}</strong>
+            <small>Created by admins</small>
+        </article>
+        {% if user_role == "admin" %}
+        <article class="dash-stat-card alert-card">
+            <span>Users</span>
+            <strong>{{ dashboard_data.user_count }}</strong>
+            <small>{{ dashboard_data.admin_count }} admins</small>
+        </article>
+        <article class="dash-stat-card">
+            <span>Errors</span>
+            <strong>{{ dashboard_data.error_count }}</strong>
+            <small>{{ dashboard_data.log_count }} log entries</small>
+        </article>
         {% endif %}
+    </section>
+
+    <section class="dash-two-column">
+        <article class="dash-panel">
+            <div class="dash-panel-head">
+                <div>
+                    <p class="dash-kicker">Recent playlists</p>
+                    <h2>Your latest imports</h2>
+                </div>
+                <a class="ghost-btn mini-action" href="{{ url_for('spotify_import') }}">Import</a>
+            </div>
+
+            {% if dashboard_data.recent_playlists %}
+            <div class="dash-list">
+                {% for playlist in dashboard_data.recent_playlists %}
+                <div class="dash-list-row">
+                    <div class="playlist-thumb">
+                        {% if playlist.image_url %}
+                        <img src="{{ playlist.image_url }}" alt="">
+                        {% else %}
+                        <span>{{ playlist.name[:1]|upper }}</span>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <h3>{{ playlist.name }}</h3>
+                        <p>{{ playlist.owner_name or "Unknown owner" }}</p>
+                    </div>
+                    <span class="soft-pill">{{ playlist.track_count }} tracks</span>
+                    {% if playlist.spotify_url %}
+                    <a class="text-link" href="{{ playlist.spotify_url }}" target="_blank" rel="noreferrer">Spotify</a>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-import-state compact-empty">
+                <p>No playlist imports yet.</p>
+                <a class="primary-btn inline-btn" href="{{ url_for('spotify_import') }}">Start import</a>
+            </div>
+            {% endif %}
+        </article>
+
+        <article class="dash-panel">
+            <div class="dash-panel-head">
+                <div>
+                    <p class="dash-kicker">Recent songs</p>
+                    <h2>Newest in your library</h2>
+                </div>
+                <a class="ghost-btn mini-action" href="{{ url_for('songs') }}">All songs</a>
+            </div>
+
+            {% if dashboard_data.recent_tracks %}
+            <div class="track-stack">
+                {% for track in dashboard_data.recent_tracks %}
+                <div class="track-mini">
+                    <span class="track-dot"></span>
+                    <div>
+                        <h3>{{ track.track_name }}</h3>
+                        <p>{{ track.artist_names or "Unknown artist" }} · {{ track.playlist_name }}</p>
+                    </div>
+                    <span class="soft-pill">{{ track.source_type|title }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-import-state compact-empty">
+                <p>No songs saved yet. Import a playlist or add a manual song.</p>
+            </div>
+            {% endif %}
+        </article>
     </section>
 
     {% if user_role == "admin" %}
-    <section class="content-section">
-        <div class="section-head">
+    <section class="dash-panel admin-control-panel">
+        <div class="dash-panel-head">
             <div>
-                <p class="eyebrow">Admin dashboard</p>
+                <p class="dash-kicker">Admin controls</p>
                 <h2>Manage users</h2>
             </div>
+            <a class="ghost-btn mini-action" href="{{ url_for('dashboard') }}">Refresh</a>
         </div>
 
-        <div class="admin-table">
+        <div class="admin-table modern-admin-table">
             <div class="admin-row admin-row-head">
                 <span>Name</span>
                 <span>Email</span>
@@ -133,57 +182,48 @@
         </div>
     </section>
 
-    <section class="content-section">
-        <div class="section-head">
-            <div>
-                <p class="eyebrow">Console</p>
-                <h2>Active logs and errors</h2>
+    <section class="dash-two-column admin-lower-grid">
+        <article class="dash-panel">
+            <div class="dash-panel-head">
+                <div>
+                    <p class="dash-kicker">Console</p>
+                    <h2>Recent app events</h2>
+                </div>
             </div>
-            <a class="ghost-btn" href="{{ url_for('dashboard') }}">Refresh logs</a>
-        </div>
-
-        <div class="console-panel">
-            {% if app_logs %}
-                {% for log in app_logs %}
-                <article class="console-line {{ log.level }}">
-                    <div class="console-meta">
-                        <span>{{ log.time }}</span>
-                        <strong>{{ log.level|upper }}</strong>
-                        <span>{{ log.method }} {{ log.path }}</span>
-                    </div>
-                    <p>{{ log.message }}</p>
-                    {% if log.details %}
-                    <code>{{ log.details }}</code>
-                    {% endif %}
-                </article>
-                {% endfor %}
-            {% else %}
-            <div class="console-empty">No logs captured yet.</div>
-            {% endif %}
-        </div>
-    </section>
-
-    <section class="content-section">
-        <div class="section-head">
-            <div>
-                <p class="eyebrow">Admin shortcuts</p>
-                <h2>Library actions</h2>
+            <div class="console-panel compact-console">
+                {% if app_logs %}
+                    {% for log in app_logs[:8] %}
+                    <article class="console-line {{ log.level }}">
+                        <div class="console-meta">
+                            <span>{{ log.time }}</span>
+                            <strong>{{ log.level|upper }}</strong>
+                            <span>{{ log.method }} {{ log.path }}</span>
+                        </div>
+                        <p>{{ log.message }}</p>
+                        {% if log.details %}
+                        <code>{{ log.details }}</code>
+                        {% endif %}
+                    </article>
+                    {% endfor %}
+                {% else %}
+                <div class="console-empty">No logs captured yet.</div>
+                {% endif %}
             </div>
-        </div>
+        </article>
 
-        <div class="dashboard-grid">
-            <article class="dashboard-card">
-                <h3>Manual song entry</h3>
-                <p>Add a track by hand to any imported playlist from the home page admin tools.</p>
-                <a class="primary-btn inline-btn" href="{{ url_for('home') }}#admin-tools">Open admin tools</a>
-            </article>
-
-            <article class="dashboard-card">
-                <h3>Playlist imports</h3>
-                <p>Review imported playlists, reconnect Spotify, and keep the local library current.</p>
-                <a class="ghost-btn inline-btn" href="{{ url_for('spotify_import') }}">Open importer</a>
-            </article>
-        </div>
+        <article class="dash-panel quick-actions-panel">
+            <div class="dash-panel-head">
+                <div>
+                    <p class="dash-kicker">Quick actions</p>
+                    <h2>Keep things moving</h2>
+                </div>
+            </div>
+            <div class="quick-action-list">
+                <a href="{{ url_for('home') }}#admin-tools">Add a manual song</a>
+                <a href="{{ url_for('spotify_import') }}">Connect or import Spotify</a>
+                <a href="{{ url_for('cookie_tools') }}">Open admin cookie tools</a>
+            </div>
+        </article>
     </section>
     {% endif %}
 </main>
