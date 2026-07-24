@@ -35,6 +35,7 @@ def _login(client, role="user"):
     """Put a user in the session and stub the decorator's lookup."""
     with client.session_transaction() as sess:
         sess["user_id"] = 1
+        sess["csrf_token"] = "test-csrf-token"
     patcher = patch(
         "app.auth.get_user_by_id",
         return_value={"id": 1, "role": role},
@@ -65,6 +66,8 @@ def test_login_page_get(client):
 
 @patch("app.controllers.authController.get_connection")
 def test_login_success(mock_conn, client):
+    with client.session_transaction() as sess:
+        sess["csrf_token"] = "test-csrf-token"
 
     fake_user = {
         "id": 1,
@@ -85,6 +88,7 @@ def test_login_success(mock_conn, client):
     response = client.post(
         "/login",
         data={
+            "csrf_token": "test-csrf-token",
             "email": "test@test.com",
             "password": "password",
         },
@@ -99,6 +103,8 @@ def test_login_success(mock_conn, client):
 
 @patch("app.controllers.authController.get_connection")
 def test_login_invalid(mock_conn, client):
+    with client.session_transaction() as sess:
+        sess["csrf_token"] = "test-csrf-token"
 
     cursor = MagicMock()
     cursor.fetchone.return_value = None
@@ -111,6 +117,7 @@ def test_login_invalid(mock_conn, client):
     response = client.post(
         "/login",
         data={
+            "csrf_token": "test-csrf-token",
             "email": "wrong@test.com",
             "password": "wrong",
         },
