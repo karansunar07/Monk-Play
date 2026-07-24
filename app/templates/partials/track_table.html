@@ -5,6 +5,7 @@
         data-title="{{ track.track_name }}"
         data-artist="{{ track.artist_names or 'Unknown artist' }}"
         data-album="{{ track.album_name or track.playlist_name or 'Manual' }}"
+        data-playlist="{{ track.playlist_name or 'Manual' }}"
         data-src="{{ track.local_file_url or '' }}"
         data-embed-url="{% if track.spotify_track_id and not track.local_file_url %}https://open.spotify.com/embed/track/{{ track.spotify_track_id }}?utm_source=generator&theme=0{% endif %}"
         data-cover="{{ track.playlist_image_url or '' }}"
@@ -29,10 +30,10 @@
         <button
             class="track-play-btn spotify-track-btn"
             type="button"
-            data-play-label="Spotify"
-            aria-label="Play {{ track.track_name }} on Spotify"
+            data-play-label="Play"
+            aria-label="Play {{ track.track_name }}"
         >
-            Spotify
+            Play
         </button>
         {% elif track.spotify_url %}
         <span class="track-play-btn disabled">No audio</span>
