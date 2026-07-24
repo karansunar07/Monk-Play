@@ -7,21 +7,50 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=dashboard-command-7">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=player-restore-17">
 </head>
 <body>
     <header class="topbar">
-        <a class="brand" href="{{ url_for('home') }}">
-            <span class="brand-dot"></span>
-            <span>Monk Play</span>
-        </a>
+        <div class="topbar-left">
+            <a class="brand compact-brand" href="{{ url_for('home') }}" aria-label="Monk Play home">
+                <span class="brand-dot"></span>
+                <span>Monk Play</span>
+            </a>
+        </div>
+
+        <div class="playbar-search-wrap">
+            <a class="playbar-icon-btn" href="{{ url_for('home') }}" aria-label="Home">
+                <span class="home-glyph" aria-hidden="true"></span>
+            </a>
+            <form class="playbar-search" action="{{ url_for('songs') }}" method="get" role="search">
+                <span class="search-glyph" aria-hidden="true"></span>
+                <label class="sr-only" for="global-song-search">Search songs</label>
+                <input
+                    id="global-song-search"
+                    name="q"
+                    type="search"
+                    value="{{ request.args.get('q', '') }}"
+                    placeholder="What do you want to play?"
+                    autocomplete="off"
+                >
+                <span class="search-divider" aria-hidden="true"></span>
+                <button class="library-glyph-btn" type="submit" aria-label="Search library">
+                    <span class="library-glyph" aria-hidden="true"></span>
+                </button>
+            </form>
+        </div>
 
         <nav class="topnav">
-            <a href="{{ url_for('home') }}">Home</a>
-            <a href="{{ url_for('songs') }}">All songs</a>
+            <a href="{{ url_for('songs') }}">Songs</a>
             {% if session.get("user_id") %}
             <a href="{{ url_for('dashboard') }}">Dashboard</a>
-            <span class="nav-user">Hi, {{ session.get("user_name") }}</span>
+            <a class="top-icon-link" href="{{ url_for('profile') }}" aria-label="Profile">
+                {% if session.get("avatar_url") %}
+                <img src="{{ session.get('avatar_url') }}" alt="">
+                {% else %}
+                <span>{{ (session.get("user_name") or "U")[:1]|upper }}</span>
+                {% endif %}
+            </a>
             <a class="nav-btn" href="{{ url_for('logout') }}">Logout</a>
             {% else %}
             <a href="{{ url_for('login') }}">Login</a>
@@ -41,6 +70,7 @@
     {% endwith %}
 
     {% block content %}{% endblock %}
-    <script src="{{ url_for('static', filename='js/app.js') }}?v=dashboard-command-7"></script>
+    {% include "partials/music_player.html" %}
+    <script src="{{ url_for('static', filename='js/app.js') }}?v=player-restore-17"></script>
 </body>
 </html>
