@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+
+{% block title %}My Profile | Monk Play{% endblock %}
+
+{% block content %}
+<main class="dashboard-layout dashboard-command profile-page">
+    <section class="dash-hero profile-hero">
+        <div class="dash-hero-copy">
+            <p class="dash-kicker">MySQL account record</p>
+            <h1>{{ profile.name }}</h1>
+            <p>
+                This page shows the safe user data stored in the MySQL database. Passwords are protected and never displayed.
+            </p>
+            <div class="dash-actions">
+                <a class="primary-btn" href="{{ url_for('dashboard') }}">Back to dashboard</a>
+                <a class="ghost-btn" href="{{ url_for('songs') }}">View songs</a>
+            </div>
+        </div>
+
+        <aside class="dash-status-card">
+            <div class="profile-avatar-preview">
+                {% if profile.avatar_url %}
+                <img src="{{ profile.avatar_url }}" alt="{{ profile.name }} profile photo">
+                {% else %}
+                <span>{{ (profile.name or "U")[:1]|upper }}</span>
+                {% endif %}
+            </div>
+            <p>Profile photo</p>
+            <strong>{{ profile.role|title }}</strong>
+            <small>Your image path is stored in MySQL and the file is saved in static uploads.</small>
+        </aside>
+    </section>
+
+    <section class="profile-grid">
+        <article class="dash-panel profile-panel">
+            <div class="dash-panel-head">
+                <div>
+                    <p class="dash-kicker">Account details</p>
+                    <h2>Stored user record</h2>
+                </div>
+                <span class="soft-pill">{{ profile.role|title }}</span>
+            </div>
+
+            <dl class="profile-record-list">
+                <div>
+                    <dt>User ID</dt>
+                    <dd>{{ profile.id }}</dd>
+                </div>
+                <div>
+                    <dt>Name</dt>
+                    <dd>{{ profile.name }}</dd>
+                </div>
+                <div>
+                    <dt>Email</dt>
+                    <dd>{{ profile.email }}</dd>
+                </div>
+                <div>
+                    <dt>Role</dt>
+                    <dd>{{ profile.role|title }}</dd>
+                </div>
+                <div>
+                    <dt>Password</dt>
+                    <dd>{{ profile.password_status }}</dd>
+                </div>
+                <div>
+                    <dt>Created</dt>
+                    <dd>{{ profile.created_at or "Stored in MySQL" }}</dd>
+                </div>
+                <div>
+                    <dt>Last updated</dt>
+                    <dd>{{ profile.updated_at or "Not updated yet" }}</dd>
+                </div>
+            </dl>
+        </article>
+
+        <article class="dash-panel profile-panel">
+            <div class="dash-panel-head">
+                <div>
+                    <p class="dash-kicker">Library data</p>
+                    <h2>Linked records</h2>
+                </div>
+            </div>
+
+            <div class="profile-stat-list">
+                <div>
+                    <strong>{{ profile.playlist_count }}</strong>
+                    <span>Playlists stored</span>
+                </div>
+                <div>
+                    <strong>{{ profile.track_count }}</strong>
+                    <span>Tracks stored</span>
+                </div>
+                <div>
+                    <strong>{{ profile.local_track_count }}</strong>
+                    <span>Local uploaded tracks</span>
+                </div>
+                <div>
+                    <strong>{{ profile.manual_track_count }}</strong>
+                    <span>Manual admin tracks</span>
+                </div>
+            </div>
+        </article>
+    </section>
+
+    <section class="profile-grid profile-action-grid">
+        <article class="dash-panel profile-panel">
+            <div class="dash-panel-head">
+                <div>
+                    <p class="dash-kicker">Profile image</p>
+                    <h2>Upload photo</h2>
+                </div>
+            </div>
+
+            <form class="auth-form profile-form" method="post" action="{{ url_for('update_profile_avatar') }}" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                <label for="profile_image">Choose image</label>
+                <input id="profile_image" name="profile_image" type="file" accept="image/png,image/jpeg,image/webp,image/gif" required>
+
+                <button class="primary-btn full-width" type="submit">Upload profile photo</button>
+            </form>
+        </article>
+
+        <article class="dash-panel profile-panel">
+            <div class="dash-panel-head">
+                <div>
+                    <p class="dash-kicker">Account security</p>
+                    <h2>Change password</h2>
+                </div>
+            </div>
+
+            <form class="auth-form profile-form" method="post" action="{{ url_for('change_profile_password') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                <label for="current_password">Current password</label>
+                <input id="current_password" name="current_password" type="password" placeholder="Enter current password" required>
+
+                <label for="new_password">New password</label>
+                <input id="new_password" name="new_password" type="password" placeholder="Minimum 6 characters" required>
+
+                <label for="confirm_password">Confirm new password</label>
+                <input id="confirm_password" name="confirm_password" type="password" placeholder="Repeat new password" required>
+
+                <button class="primary-btn full-width" type="submit">Change password</button>
+            </form>
+        </article>
+    </section>
+
+    <section class="dash-panel password-note-panel">
+        <div class="dash-panel-head">
+            <div>
+                <p class="dash-kicker">Password protection</p>
+                <h2>How the database stores passwords</h2>
+            </div>
+        </div>
+        <p>
+            Monk Play stores passwords using a one-way password hash before saving them in MySQL. The site can verify your login,
+            but it does not display the original password or the stored hash on this page. For the newest live database records,
+            open MySQL Workbench and rerun the checking queries in <code>monk_play_mysql_workbench.sql</code>.
+        </p>
+    </section>
+</main>
+{% endblock %}

@@ -14,6 +14,7 @@
             <div class="dash-actions">
                 <a class="primary-btn" href="{{ url_for('songs') }}">Open songs</a>
                 <a class="ghost-btn" href="{{ url_for('spotify_import') }}">Import playlist</a>
+                <a class="ghost-btn" href="{{ url_for('profile') }}">View MySQL profile</a>
             </div>
         </div>
 
@@ -56,7 +57,7 @@
         <article class="dash-stat-card alert-card">
             <span>Users</span>
             <strong>{{ dashboard_data.user_count }}</strong>
-            <small>{{ dashboard_data.admin_count }} admins</small>
+            <small>{{ dashboard_data.admin_count }} admins · {{ dashboard_data.artist_count }} artists</small>
         </article>
         <article class="dash-stat-card">
             <span>Errors</span>
@@ -161,6 +162,7 @@
                 <input name="email" type="email" value="{{ managed_user.email }}" aria-label="User email" maxlength="100" required>
                 <select name="role" class="auth-select" aria-label="User role">
                     <option value="user" {% if managed_user.role == "user" %}selected{% endif %}>User</option>
+                    <option value="artist" {% if managed_user.role == "artist" %}selected{% endif %}>Artist</option>
                     <option value="admin" {% if managed_user.role == "admin" %}selected{% endif %}>Admin</option>
                 </select>
                 <span>{{ managed_user.playlist_count }}</span>
