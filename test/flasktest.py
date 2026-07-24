@@ -1,5 +1,6 @@
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
+import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -7,6 +8,8 @@ from werkzeug.security import generate_password_hash
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 
 @pytest.fixture(scope="module")
@@ -57,14 +60,20 @@ def test_home_page_loads_without_database(app_module, client):
 
 
 def test_songs_search_loads_full_library_for_browser_filtering(app_module, client):
-    conn, cursor = _mock_connection(fetchall_values=[[]])
+    conn, cursor = _mock_connection(fetchall_values=[[], []])
 
     with patch.object(app_module, "get_connection", return_value=conn):
         response = client.get("/songs?q=moon")
 
     assert response.status_code == 200
-    executed_query, params = cursor.execute.call_args.args
-    assert "LIKE" not in executed_query
+    track_queries = [
+        call.args
+        for call in cursor.execute.call_args_list
+        if "FROM imported_playlist_tracks" in call.args[0]
+    ]
+    full_library_query, params = track_queries[0]
+    assert "LIKE" not in full_library_query
+    assert "LIMIT" not in full_library_query
     assert params == []
 
 
