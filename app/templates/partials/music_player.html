@@ -1,15 +1,16 @@
-{% if first_playable_track %}
+{% set player_track = first_playable_track|default(base_first_playable_track|default(None)) %}
+{% if player_track %}
 <section class="music-player" aria-label="Music player">
     <div class="player-now">
         <button id="close-player-btn" class="player-mini-btn" type="button" aria-label="Hide player">Close</button>
-        {% if first_playable_track.playlist_image_url %}
-        <img id="player-cover" class="player-cover" src="{{ first_playable_track.playlist_image_url }}" alt="">
+        {% if player_track.playlist_image_url %}
+        <img id="player-cover" class="player-cover" src="{{ player_track.playlist_image_url }}" alt="">
         {% else %}
         <div id="player-cover" class="player-cover" aria-hidden="true">MP</div>
         {% endif %}
         <div>
-            <strong id="player-title">{{ first_playable_track.track_name }}</strong>
-            <span id="player-artist">{{ first_playable_track.artist_names or "Unknown artist" }}</span>
+            <strong id="player-title">{{ player_track.track_name }}</strong>
+            <span id="player-artist">{{ player_track.artist_names or "Unknown artist" }}</span>
         </div>
         <button id="save-track-btn" class="player-mini-btn" type="button" aria-label="Save track">Save</button>
     </div>
