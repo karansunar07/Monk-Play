@@ -17,6 +17,7 @@ BASE_DIR = os.path.dirname(__file__)
 TEMPLATE_DIR = os.path.join(BASE_DIR, "app", "templates")
 STATIC_DIR = os.path.join(BASE_DIR, "app", "statics")
 UPLOAD_DIR = os.path.join(STATIC_DIR, "uploads", "music")
+PROFILE_UPLOAD_DIR = os.path.join(STATIC_DIR, "uploads", "profiles")
 
 
 app = Flask(__name__, template_folder=TEMPLATE_DIR, static_folder=STATIC_DIR)
@@ -25,15 +26,33 @@ app.config["SECRET_KEY"] = config.SECRET_KEY
 SPOTIFY_SCOPES = "playlist-read-private playlist-read-collaborative user-read-private"
 APP_LOGS = deque(maxlen=120)
 ALLOWED_MUSIC_EXTENSIONS = {"mp3", "wav", "ogg", "m4a", "flac", "aac"}
+ALLOWED_PROFILE_EXTENSIONS = {"jpg", "jpeg", "png", "webp", "gif"}
 COOKIE_MAX_AGE = 60 * 60 * 24 * 30
+PASSWORD_HASH_METHOD = "pbkdf2:sha256"
+VALID_USER_ROLES = {"user", "artist", "admin"}
 
 
 @app.context_processor
 def inject_provider_state():
+    base_first_playable_track = None
+    if has_request_context() and request.endpoint != "static":
+        try:
+            base_first_playable_track = next(
+                (
+                    track
+                    for track in get_saved_tracks(limit=1)
+                    if track.get("local_file_url") or track.get("spotify_track_id")
+                ),
+                None,
+            )
+        except Exception:
+            base_first_playable_track = None
+
     return {
         "spotify_connected": bool(session.get("spotify_access_token")),
         "is_admin": session.get("user_role") == "admin",
         "csrf_token": get_csrf_token,
+        "base_first_playable_track": base_first_playable_track,
     }
 
 
@@ -97,7 +116,51 @@ def log_unhandled_error(error):
 def login_user_session(user):
     session["user_id"] = user["id"]
     session["user_name"] = user["name"]
-    session["user_role"] = user.get("role", "user")
+    session["user_role"] = user.get("role") if user.get("role") in VALID_USER_ROLES else "user"
+    session["avatar_url"] = user.get("avatar_url") or ""
+
+
+def hash_password(password):
+    return generate_password_hash(password, method=PASSWORD_HASH_METHOD, salt_length=16)
+
+
+def is_password_hash(stored_password):
+    return bool(stored_password) and (
+        stored_password.startswith("pbkdf2:")
+        or stored_password.startswith("scrypt:")
+        or stored_password.startswith("argon2:")
+    )
+
+
+def verify_stored_password(stored_password, submitted_password):
+    if not stored_password:
+        return False
+    if is_password_hash(stored_password):
+        return check_password_hash(stored_password, submitted_password)
+    return secrets.compare_digest(stored_password, submitted_password)
+
+
+def get_password_storage_status(stored_password):
+    return "hashed" if is_password_hash(stored_password or "") else "legacy_plain_text"
+
+
+def record_login_event(cursor, email, status, user=None):
+    cursor.execute(
+        """
+        INSERT INTO login_events (
+            user_id, email, status, ip_address, user_agent, password_storage_status
+        )
+        VALUES (%s, %s, %s, %s, %s, %s)
+        """,
+        (
+            user.get("id") if user else None,
+            email[:100],
+            status,
+            (request.headers.get("X-Forwarded-For", request.remote_addr or "").split(",")[0].strip())[:45],
+            (request.user_agent.string or "")[:255],
+            get_password_storage_status(user.get("password", "")) if user else "not_available",
+        ),
+    )
 
 
 def get_role_for_new_user(cursor):
@@ -137,7 +200,7 @@ def get_imported_playlists(user_id=None):
     return playlists
 
 
-def get_saved_tracks(user_id=None, limit=12):
+def get_saved_tracks(user_id=None, limit=12, search_query=""):
     conn = get_connection()
     if conn is None:
         return []
@@ -159,14 +222,30 @@ def get_saved_tracks(user_id=None, limit=12):
     JOIN imported_playlists
         ON imported_playlists.id = imported_playlist_tracks.imported_playlist_id
     """
-    params = ()
+    filters = []
+    params = []
     if user_id:
-        query += "WHERE imported_playlists.user_id = %s "
-        params = (user_id,)
+        filters.append("imported_playlists.user_id = %s")
+        params.append(user_id)
+    if search_query:
+        filters.append(
+            """
+            (
+                imported_playlist_tracks.track_name LIKE %s
+                OR imported_playlist_tracks.artist_names LIKE %s
+                OR imported_playlist_tracks.album_name LIKE %s
+                OR imported_playlists.name LIKE %s
+            )
+            """
+        )
+        search_term = f"%{search_query}%"
+        params.extend([search_term, search_term, search_term, search_term])
+    if filters:
+        query += "WHERE " + " AND ".join(filters) + " "
     query += "ORDER BY imported_playlist_tracks.id DESC "
     if limit:
         query += "LIMIT %s"
-        params = params + (limit,)
+        params.append(limit)
     cursor.execute(query, params)
     tracks = cursor.fetchall()
     cursor.close()
@@ -205,8 +284,101 @@ def get_admin_users():
     return users
 
 
+def get_user_profile_data(user_id):
+    profile = {
+        "id": "",
+        "name": "",
+        "email": "",
+        "role": "",
+        "avatar_url": "",
+        "password_status": "Protected with an encrypted password hash",
+        "playlist_count": 0,
+        "track_count": 0,
+        "manual_track_count": 0,
+        "local_track_count": 0,
+        "created_at": "",
+        "updated_at": "",
+    }
+
+    if not user_id:
+        return profile
+
+    conn = get_connection()
+    if conn is None:
+        return profile
+
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT id, name, email, role, avatar_url, password, created_at, updated_at
+            FROM users
+            WHERE id = %s
+            """,
+            (user_id,),
+        )
+        user = cursor.fetchone()
+        if not user:
+            return profile
+
+        profile.update(
+            {
+                "id": user.get("id", ""),
+                "name": user.get("name", ""),
+                "email": user.get("email", ""),
+                "role": user.get("role", "user"),
+                "avatar_url": user.get("avatar_url") or "",
+                "password_status": (
+                    "Protected with an encrypted password hash"
+                    if is_password_hash(user.get("password", ""))
+                    else "Needs password reset to replace an old plain-text value"
+                ),
+                "created_at": user.get("created_at", ""),
+                "updated_at": user.get("updated_at", ""),
+            }
+        )
+
+        cursor.execute(
+            """
+            SELECT COUNT(*) AS playlist_count
+            FROM imported_playlists
+            WHERE user_id = %s
+            """,
+            (user_id,),
+        )
+        profile["playlist_count"] = (cursor.fetchone() or {}).get("playlist_count", 0)
+
+        cursor.execute(
+            """
+            SELECT
+                COUNT(*) AS track_count,
+                SUM(CASE WHEN imported_playlist_tracks.source_type = 'manual' THEN 1 ELSE 0 END) AS manual_track_count,
+                SUM(CASE WHEN imported_playlist_tracks.local_file_url IS NOT NULL
+                    AND imported_playlist_tracks.local_file_url != '' THEN 1 ELSE 0 END) AS local_track_count
+            FROM imported_playlist_tracks
+            INNER JOIN imported_playlists
+                ON imported_playlists.id = imported_playlist_tracks.imported_playlist_id
+            WHERE imported_playlists.user_id = %s
+            """,
+            (user_id,),
+        )
+        track_totals = cursor.fetchone() or {}
+        profile["track_count"] = track_totals.get("track_count") or 0
+        profile["manual_track_count"] = track_totals.get("manual_track_count") or 0
+        profile["local_track_count"] = track_totals.get("local_track_count") or 0
+    finally:
+        cursor.close()
+        conn.close()
+
+    return profile
+
+
 def is_allowed_music_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_MUSIC_EXTENSIONS
+
+
+def is_allowed_profile_file(filename):
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_PROFILE_EXTENSIONS
 
 
 def save_music_file(file_storage):
@@ -221,6 +393,20 @@ def save_music_file(file_storage):
     unique_filename = f"{secrets.token_hex(8)}_{filename}"
     file_storage.save(os.path.join(UPLOAD_DIR, unique_filename))
     return url_for("static", filename=f"uploads/music/{unique_filename}")
+
+
+def save_profile_image(file_storage, user_id):
+    if not file_storage or not file_storage.filename:
+        return ""
+    if not is_allowed_profile_file(file_storage.filename):
+        return None
+
+    os.makedirs(PROFILE_UPLOAD_DIR, exist_ok=True)
+    filename = secure_filename(file_storage.filename)
+    extension = filename.rsplit(".", 1)[1].lower()
+    unique_filename = f"profile-{user_id}-{secrets.token_hex(8)}.{extension}"
+    file_storage.save(os.path.join(PROFILE_UPLOAD_DIR, unique_filename))
+    return url_for("static", filename=f"uploads/profiles/{unique_filename}")
 
 
 def get_or_create_manual_playlist(cursor, user_id):
@@ -268,6 +454,7 @@ def get_dashboard_data(user_id, user_role):
         "recent_tracks": [],
         "user_count": 0,
         "admin_count": 0,
+        "artist_count": 0,
         "log_count": len(APP_LOGS),
         "error_count": sum(1 for log in APP_LOGS if log.get("level") == "error"),
         "spotify_connected": bool(session.get("spotify_access_token")),
@@ -354,13 +541,15 @@ def get_dashboard_data(user_id, user_role):
                 """
                 SELECT
                     COUNT(*) AS user_count,
-                    SUM(CASE WHEN role = 'admin' THEN 1 ELSE 0 END) AS admin_count
+                    SUM(CASE WHEN role = 'admin' THEN 1 ELSE 0 END) AS admin_count,
+                    SUM(CASE WHEN role = 'artist' THEN 1 ELSE 0 END) AS artist_count
                 FROM users
                 """
             )
             admin_totals = cursor.fetchone() or {}
             dashboard["user_count"] = admin_totals.get("user_count", 0)
             dashboard["admin_count"] = admin_totals.get("admin_count", 0)
+            dashboard["artist_count"] = admin_totals.get("artist_count", 0)
     except Exception as error:
         write_app_log("error", "Dashboard data could not be loaded", str(error))
     finally:
@@ -692,6 +881,7 @@ def home():
 
 @app.route("/songs")
 def songs():
+    search_query = request.args.get("q", "").strip()
     saved_tracks = get_saved_tracks(limit=None)
     first_playable_track = next(
         (track for track in saved_tracks if track.get("local_file_url") or track.get("spotify_track_id")),
@@ -701,6 +891,7 @@ def songs():
         "songs.html",
         saved_tracks=saved_tracks,
         first_playable_track=first_playable_track,
+        search_query=search_query,
     )
 
 
@@ -719,6 +910,94 @@ def dashboard():
         admin_users=get_admin_users() if is_admin_user() else [],
         app_logs=list(APP_LOGS) if is_admin_user() else [],
     )
+
+
+@app.route("/profile")
+def profile():
+    if not session.get("user_id"):
+        flash("Login first to view your stored profile.", "danger")
+        return redirect(url_for("login"))
+
+    return render_template(
+        "profile.html",
+        profile=get_user_profile_data(session.get("user_id")),
+    )
+
+
+@app.route("/profile/avatar", methods=["POST"])
+def update_profile_avatar():
+    if not session.get("user_id"):
+        flash("Login first to update your profile.", "danger")
+        return redirect(url_for("login"))
+
+    avatar_url = save_profile_image(request.files.get("profile_image"), session.get("user_id"))
+    if avatar_url is None:
+        flash("Upload a valid profile image: jpg, jpeg, png, webp, or gif.", "danger")
+        return redirect(url_for("profile"))
+    if not avatar_url:
+        flash("Choose a profile image before uploading.", "danger")
+        return redirect(url_for("profile"))
+
+    conn = get_connection()
+    if conn is None:
+        flash("Database is not available right now.", "danger")
+        return redirect(url_for("profile"))
+
+    cursor = conn.cursor()
+    cursor.execute("UPDATE users SET avatar_url = %s WHERE id = %s", (avatar_url, session.get("user_id")))
+    conn.commit()
+    cursor.close()
+    conn.close()
+    session["avatar_url"] = avatar_url
+
+    flash("Profile photo updated.", "success")
+    return redirect(url_for("profile"))
+
+
+@app.route("/profile/password", methods=["POST"])
+def change_profile_password():
+    if not session.get("user_id"):
+        flash("Login first to change your password.", "danger")
+        return redirect(url_for("login"))
+
+    current_password = request.form.get("current_password", "")
+    new_password = request.form.get("new_password", "")
+    confirm_password = request.form.get("confirm_password", "")
+
+    if not current_password or not new_password or not confirm_password:
+        flash("Current password, new password, and confirmation are required.", "danger")
+        return redirect(url_for("profile"))
+    if len(new_password) < 6:
+        flash("New password must be at least 6 characters.", "danger")
+        return redirect(url_for("profile"))
+    if new_password != confirm_password:
+        flash("New password and confirmation do not match.", "danger")
+        return redirect(url_for("profile"))
+
+    conn = get_connection()
+    if conn is None:
+        flash("Database is not available right now.", "danger")
+        return redirect(url_for("profile"))
+
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, password FROM users WHERE id = %s", (session.get("user_id"),))
+    user = cursor.fetchone()
+    if not user or not verify_stored_password(user.get("password", ""), current_password):
+        cursor.close()
+        conn.close()
+        flash("Current password is incorrect.", "danger")
+        return redirect(url_for("profile"))
+
+    cursor.execute(
+        "UPDATE users SET password = %s WHERE id = %s",
+        (hash_password(new_password), session.get("user_id")),
+    )
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    flash("Password changed successfully.", "success")
+    return redirect(url_for("profile"))
 
 
 @app.route("/cookies", methods=["GET", "POST"])
@@ -786,7 +1065,7 @@ def update_user_role(user_id):
         return redirect(url_for("dashboard"))
 
     new_role = request.form.get("role", "").strip().lower()
-    if new_role not in {"admin", "user"}:
+    if new_role not in VALID_USER_ROLES:
         flash("Choose a valid role.", "danger")
         return redirect(url_for("dashboard"))
 
@@ -804,7 +1083,7 @@ def update_user_role(user_id):
         flash("That user could not be found.", "danger")
         return redirect(url_for("dashboard"))
 
-    if user_id == session.get("user_id") and user.get("role") == "admin" and new_role == "user":
+    if user_id == session.get("user_id") and user.get("role") == "admin" and new_role != "admin":
         if get_admin_count(cursor) <= 1:
             cursor.close()
             conn.close()
@@ -846,7 +1125,7 @@ def edit_user(user_id):
     if len(email) > 100:
         flash("Email must be less than 100 characters.", "danger")
         return redirect(url_for("dashboard"))
-    if role not in {"admin", "user"}:
+    if role not in VALID_USER_ROLES:
         flash("Choose a valid role.", "danger")
         return redirect(url_for("dashboard"))
 
@@ -864,7 +1143,7 @@ def edit_user(user_id):
         flash("That user could not be found.", "danger")
         return redirect(url_for("dashboard"))
 
-    if user.get("role") == "admin" and role == "user" and get_admin_count(cursor) <= 1:
+    if user.get("role") == "admin" and role != "admin" and get_admin_count(cursor) <= 1:
         cursor.close()
         conn.close()
         flash("You cannot remove the last admin account.", "danger")
@@ -1011,6 +1290,13 @@ def login():
         password = request.form.get("password", "")
 
         if not email or not password:
+            conn = get_connection()
+            if conn is not None:
+                cursor = conn.cursor()
+                record_login_event(cursor, email or "missing-email", "missing_fields")
+                conn.commit()
+                cursor.close()
+                conn.close()
             flash("Email and password are required.", "danger")
             return redirect(url_for("login"))
 
@@ -1022,14 +1308,27 @@ def login():
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM users WHERE email = %s", (email,))
         user = cursor.fetchone()
-        cursor.close()
-        conn.close()
 
-        if user and check_password_hash(user["password"], password):
+        if user and verify_stored_password(user["password"], password):
+            if not is_password_hash(user["password"]):
+                upgraded_password = hash_password(password)
+                cursor.execute(
+                    "UPDATE users SET password = %s WHERE id = %s",
+                    (upgraded_password, user["id"]),
+                )
+                user["password"] = upgraded_password
+            record_login_event(cursor, email, "success", user)
+            conn.commit()
+            cursor.close()
+            conn.close()
             login_user_session(user)
             flash("Login successful!", "success")
             return redirect(url_for("home"))
 
+        record_login_event(cursor, email, "failed", user)
+        conn.commit()
+        cursor.close()
+        conn.close()
         flash("Invalid email or password.", "danger")
         return redirect(url_for("login"))
 
@@ -1072,7 +1371,7 @@ def forgot_password():
 
         cursor.execute(
             "UPDATE users SET password = %s WHERE id = %s",
-            (generate_password_hash(password), user["id"]),
+            (hash_password(password), user["id"]),
         )
         conn.commit()
         cursor.close()
@@ -1248,6 +1547,7 @@ def register():
         name = request.form.get("name", "").strip()
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "")
+        requested_role = request.form.get("role", "user").strip().lower()
 
         if not name or not email or not password:
             flash("All fields are required!", "danger")
@@ -1260,6 +1560,9 @@ def register():
             return redirect(url_for("register"))
         if len(password) < 6:
             flash("Password must be at least 6 characters!", "danger")
+            return redirect(url_for("register"))
+        if requested_role not in {"user", "artist"}:
+            flash("Choose a valid account type.", "danger")
             return redirect(url_for("register"))
 
         conn = get_connection()
@@ -1276,9 +1579,11 @@ def register():
             return redirect(url_for("register"))
 
         role = get_role_for_new_user(cursor)
+        if role != "admin":
+            role = requested_role
         cursor.execute(
             "INSERT INTO users (name, email, password, role) VALUES (%s, %s, %s, %s)",
-            (name, email, generate_password_hash(password), role),
+            (name, email, hash_password(password), role),
         )
         conn.commit()
         cursor.close()
