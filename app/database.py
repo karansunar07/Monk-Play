@@ -78,12 +78,36 @@ def create_tables():
             password VARCHAR(255) NOT NULL,
             role VARCHAR(20) NOT NULL DEFAULT 'user',
             google_id VARCHAR(255) UNIQUE NULL,
-            avatar_url VARCHAR(255) NULL
+            avatar_url VARCHAR(255) NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
         )
         """
     )
     ensure_column(cursor, "users", "google_id", "VARCHAR(255) NULL UNIQUE")
     ensure_column(cursor, "users", "avatar_url", "VARCHAR(255) NULL")
+    ensure_column(cursor, "users", "created_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+    ensure_column(cursor, "users", "updated_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
+
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS login_events (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NULL,
+            email VARCHAR(100) NOT NULL,
+            status VARCHAR(20) NOT NULL,
+            ip_address VARCHAR(45) NULL,
+            user_agent VARCHAR(255) NULL,
+            password_storage_status VARCHAR(80) NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_login_events_user_id (user_id),
+            INDEX idx_login_events_email (email),
+            INDEX idx_login_events_status (status),
+            INDEX idx_login_events_created_at (created_at),
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+        )
+        """
+    )
 
     cursor.execute(
         """
